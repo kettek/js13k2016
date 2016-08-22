@@ -37,6 +37,168 @@ Engine Structure
 
 var ktk = ktk || {};
 
+/*
+The render has built-in rendering optimizations! This is dictated by a "virtual size" that splits the map into sections and places sprites within those sections for rendering. The quadrant sizes are dictated by (canvas.width*2 x canvas.height*2).
+*/
+ktk.rndr = (function() {
+  /* ================ PRIVATE ================ */
+  var screen = { w: 0, h: 0 };
+  var virtual = { w: 0, h: 0, x: 0, y: 0 };
+  var images = {};
+  var sprites = [];
+  var quadrants = [];
+  // 1. find our rendering type
+  var type = 'null';
+  var canvas = document.createElement('canvas');
+  if (canvas.getContext) {
+    type = 'canvas';
+  } else {
+    console.log('Error, no canvas support!');
+  }
+  // 2. initialize renderer
+  console.log('rndr: using ' + type);
+  if (type == 'canvas') {
+    var context = null;
+    function initDisplay(display) {
+      canvas.width = window.getComputedStyle(display, null).getPropertyValue('width');
+      canvas.height = window.getComputedStyle(display, null).getPropertyValue('height');
+      context = canvas.getContext('2d');
+      display.appendChild(canvas);
+    }
+    function onRender() {
+      var start = getQuadrantIntersection(virtual.x - screen.w, virtual.y - screen.h);
+      var end = getQuadrantIntersection(virtual.x + screen.w, virtual.y + screen.h);
+      for (var i in quadrants[start.x][start.y].sprites) {
+        var sprite = quadrants[start.x][start.y].sprites[i];
+        context.drawImage(images[sprite.image], sprite.x, sprite.y);
+      }
+      for (var x = start.x; x != end.x; x++) {
+        for (var y = start.y; y != end.y; y++) {
+          for (var i in quadrants[x][y].sprites) {
+            var sprite = quadrants[x][y].sprites[i];
+            context.drawImage(images[sprite.image], sprite.x, sprite.y);
+          }
+        }
+      }
+    }
+  }
+  /* ======== Quadrant ======== */
+  function setupQuadrants() {
+    // collect old sprites
+    for (var i = 0; i < quadrants.length; i++) {
+      for (var j = 0; j < quadrants[i].length; j++) {
+        sprites = sprites.concat(quadrants[i][j].sprites);
+      }
+    }
+    // create new quadrants
+    var x = Math.ceil(virtual.w / (screen.w*2));
+    if (x == 0) x = 1;
+    var y = Math.ceil(virtual.h / (screen.h*2));
+    if (y == 0) y = 1;
+    console.log('creating ' + x + 'x' + y + ' quadrants');
+    for (var i = 0; i < x; i++) {
+      quadrants[i] = [];
+      for (var j = 0; j < y; j++) {
+        quadrants[i][j] = new Quadrant();
+      }
+    }
+    // add sprites to quadrants
+    for (var i = 0; i < sprites.length; i++) {
+      var inter = getQuadrantIntersection(sprites[i].x, sprites[i].y);
+      addSpriteToQuadrant(sprites[i], inter.x, inter.y);
+    }
+    sprites = [];
+  };
+  function addSpriteToQuadrant(sprite, x, y) {
+    sprite.quadrant.x = x;
+    sprite.quadrant.y = y;
+    sprite.quadrant.index = quadrants[x][y].sprites.length;
+    quadrants[x][y].sprites.push(sprite);
+    console.log('added sprite to ' + x + 'x' + y);
+  };
+  function moveSpriteToQuadrant(sprite) {
+    var inter = getQuadrantIntersection(sprite.x, sprite.y);
+    if (sprite.quadrant.x == inter.x && sprite.quadrant.y == inter.y) {
+      return;
+    }
+    quadrants[sprite.quadrant.x][sprite.quadrant.y].sprites.splice(sprite.quadrant.index, 1);
+    addSpriteToQuadrant(sprite, inter.x, inter.y);
+  };
+  function getQuadrantIntersection(x, y) {
+    var x = Math.floor(x / (screen.w*2));
+    if (x < 0) x = 0;
+    else if (x > quadrants.length) x = quadrants.length-1;
+    var y = Math.floor(y / (screen.h*2));
+    if (y < 0) y = 0;
+    else if (y > quadrants[0].length) y = quadrants[0].length-1;
+    return {x: x, y: y};
+  };
+  function Quadrant() {
+    this.sprites = [];
+  };
+  /* ======== Sprite ======== */
+  function setupSprite(sprite) {
+    var inter = getQuadrantIntersection(sprite.x, sprite.y);
+    addSpriteToQuadrant(sprite, inter.x, inter.y);
+  };
+  function Sprite(image, x, y) {
+    this.id = 0;
+    this.x = x;
+    this.y = y;
+    this.quadrant = {
+      x: 0,
+      y: 0,
+      index: 0
+    };
+    this.image = image;
+    //
+    this.setImage = function(image) {
+      this.image = image;
+    };
+    this.doRender = function(x, y) {
+      context.drawImage(this.image, x, y);
+    };
+  };
+
+  /* ================ PUBLIC ================ */
+  return {
+    fromElement: function(ele) {
+      initDisplay(ele);
+      return this;
+    },
+    setSize: function(w, h) {
+      screen.w = w;
+      screen.h = h;
+      if (virtual.w < w || virtual.h < h) setupQuadrants();
+      canvas.width = w;
+      canvas.height = h;
+    },
+    getSize: function() {
+      return {w: canvas.width, h: canvas.height};
+    },
+    setVirtualSize: function(w, h) {
+      virtual.w = w;
+      virtual.h = h;
+      setupQuadrants();
+    },
+    setVirtualPosition: function(x, y) {
+      virtual.x = x;
+      virtual.y = y;
+    },
+    loadImageURL: function(name, url) {
+      if (typeof images[name] !== 'undefined') return;
+      images[name] = new Image();
+      images[name].src = url;
+    },
+    createSprite: function(image, x, y) {
+      var sprite = new Sprite(image, x, y);
+      setupSprite(sprite);
+      return sprite;
+    },
+    doRender: onRender
+  };
+})();
+
 ktk.Filer = (function() {
   return {
     load: function(url) {
@@ -60,6 +222,9 @@ ktk.Filer = (function() {
 })();
 
 ktk.vio = (function() {
+  /* ** display ** */
+  var display = null;
+  var renderer = null;
   /* ** tick related ** */
   var is_running = false;
   // run at 20 ticks per second, I guess?
@@ -82,6 +247,7 @@ ktk.vio = (function() {
   /* ==== Class load/create ==== */
   function loadClasses(names) {
     return new Promise(function(resolve, reject) {
+      console.log("Loading classes...");
       classes_pending = classes_pending.concat(names);
       loadPendingClass(resolve, reject);
     });
@@ -114,7 +280,7 @@ ktk.vio = (function() {
     } else {
     }
     game.classes[name] = evaluated;
-    console.log('loaded class: ' + name);
+    console.log('  ' + name);
   }
   /* ==== Objects ==== */
   function createObject(name) {
@@ -149,7 +315,7 @@ ktk.vio = (function() {
     // probably use a state machine?
   }
   function onRender() {
-    // for each sprite in quandrants intersecting with (player[cur_player].x - screen_w . . .), render contained sprites
+    renderer.doRender();
   }
   /* ==== Loops ==== */
   function onRenderLoop() {
@@ -178,6 +344,12 @@ ktk.vio = (function() {
   }
 
   function onInit() {
+    // get display
+    display = document.getElementById('display');
+    renderer = ktk.rndr.fromElement(display);
+    console.log(renderer);
+    renderer.setSize(parseInt(window.getComputedStyle(display, null).getPropertyValue('width')), parseInt(window.getComputedStyle(display, null).getPropertyValue('height')));
+    // start running
     is_running = true;
     tick_last = new Date();
     onLoop();
@@ -185,6 +357,10 @@ ktk.vio = (function() {
     frame_last = new Date();
     onRenderLoop();
     loadGameData();
+    // bogus video test
+    renderer.loadImageURL('test', 'data/sprites/test.png');
+    renderer.createSprite('test', 16, 16);
+    renderer.setVirtualSize(1920, 1080);
   }
 
   return {
