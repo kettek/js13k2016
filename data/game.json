@@ -1,0 +1,8 @@
+{
+  title: 'VIOLENCIA',
+  classes: [
+    "entity",
+    "player",
+    "demon"
+  ]
+}
