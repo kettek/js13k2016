@@ -1,3 +1,4 @@
 {
-  name: "Player"
+  name: "Player",
+  sprite: "anim"
 }

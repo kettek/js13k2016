@@ -37,6 +37,37 @@ Engine Structure
 
 var ktk = ktk || {};
 
+ktk.getCallerName = function() {
+  var name = ktk.getCallerName.caller.toString();
+  name = name.substr('function '.length);
+  name = name.substr(0, name.indexOf('('));
+  name = name + '> ';
+  return name;
+};
+
+Object.defineProperty(this, 'fn', {
+  get: ktk.getCallerName
+});
+
+var logr = (function() {
+  var depth = 0;
+  return function LOG() {
+    if (arguments.length > 0) {
+      var args = Array.prototype.slice.call(arguments);
+      var name = LOG.caller.toString();
+      name = name.substr('function '.length);
+      name = name.substr(0, name.indexOf('('));
+      args.unshift(name+'> ');
+      args.unshift(Array(depth).join(' '));
+      console.log.apply(console, args);
+    } 
+    return function(inc) {
+      depth += inc;
+      if (depth < 0) depth = 0;
+    }
+  }
+})();
+
 /*
 The render has built-in rendering optimizations! This is dictated by a "virtual size" that splits the map into sections and places sprites within those sections for rendering. The quadrant sizes are dictated by (canvas.width*2 x canvas.height*2).
 */
@@ -45,6 +76,7 @@ ktk.rndr = (function() {
   var screen = { w: 0, h: 0 };
   var virtual = { w: 0, h: 0, x: 0, y: 0 };
   var images = {};
+  var sprite_data = {};
   var sprites = [];
   var quadrants = [];
   // 1. find our rendering type
@@ -56,7 +88,6 @@ ktk.rndr = (function() {
     console.log('Error, no canvas support!');
   }
   // 2. initialize renderer
-  console.log('rndr: using ' + type);
   if (type == 'canvas') {
     var context = null;
     function initDisplay(display) {
@@ -155,9 +186,6 @@ ktk.rndr = (function() {
     this.setImage = function(image) {
       this.image = image;
     };
-    this.doRender = function(x, y) {
-      context.drawImage(this.image, x, y);
-    };
   };
 
   /* ================ PUBLIC ================ */
@@ -184,6 +212,21 @@ ktk.rndr = (function() {
     setVirtualPosition: function(x, y) {
       virtual.x = x;
       virtual.y = y;
+    },
+    loadSprite: function(name) {
+      return new Promise(function(resolve, reject) {
+        ktk.Filer.load('data/sprites/'+name+'.json').then(function(data) {
+          // TODO: do somethin' wit it
+        }, function(error) {
+          reject(error);
+        }).then(function() {
+          if (typeof images[name] === 'undefined') {
+            images[name] = new Image();
+            images[name].src = 'data/sprites/'+name+'.png';
+          }
+          resolve("loaded");
+        });
+      });
     },
     loadImageURL: function(name, url) {
       if (typeof images[name] !== 'undefined') return;
@@ -260,9 +303,19 @@ ktk.vio = (function() {
     var name = classes_pending.shift();
     ktk.Filer.load('data/classes/'+name+'.json').then(function(data) {
       loadClass(name, data);
-      loadPendingClass(resolve, reject);
     }, function(error) {
       reject("Could not load class '" + name + "': " + error);
+    }).then(function() {
+      if (typeof game.classes[name].sprite !== 'undefined') {
+        console.log('Loading sprite "' +game.classes[name].sprite+ '"...');
+        renderer.loadSprite(game.classes[name].sprite).then(function(ok) {
+          console.log(ok);
+        }, function(err) {
+          console.log(err);
+        });
+      }
+    }).then(function() {
+      loadPendingClass(resolve, reject);
     });
   }
   function loadClass(name, code) {
@@ -280,7 +333,7 @@ ktk.vio = (function() {
     } else {
     }
     game.classes[name] = evaluated;
-    console.log('  ' + name);
+    console.log('...' + name);
   }
   /* ==== Objects ==== */
   function createObject(name) {
@@ -292,24 +345,28 @@ ktk.vio = (function() {
   }
   /* ==== Game Logic ==== */
   function loadGameData() {
-    ktk.Filer.load('data/game.json').then(function(data) {
-      // FIXME: don't eval!
-      var game_data = eval('('+data+')');
-      if (game_data.title) {
-        game.title = game_data.title;
-      }
-      if (game_data.classes) {
-        loadClasses(game_data.classes).then(function() {
-          console.log('loaded all classes!');
-        }, function(error) {
-          console.log("Failed to load classes: " + error);
-        });
-      }
-    }, function(error) {
-      console.log("Failed to load game data: " + error);
+    return new Promise(function(resolve, reject) {
+      ktk.Filer.load('data/game.json').then(function(data) {
+        // FIXME: don't eval!
+        var game_data = eval('('+data+')');
+        if (game_data.title) {
+          game.title = game_data.title;
+        }
+        if (game_data.classes) {
+          loadClasses(game_data.classes).then(function() {
+            console.log('loaded all classes!');
+            resolve();
+          }, function(error) {
+            console.log("Failed to load classes: " + error);
+            reject();
+          });
+        }
+      }, function(error) {
+        console.log("Failed to load game data: " + error);
+        reject();
+      });
     });
   }
-
   /* ==== Tick and Render ==== */
   function onTick(elapsed) {
     // probably use a state machine?
@@ -347,20 +404,20 @@ ktk.vio = (function() {
     // get display
     display = document.getElementById('display');
     renderer = ktk.rndr.fromElement(display);
-    console.log(renderer);
     renderer.setSize(parseInt(window.getComputedStyle(display, null).getPropertyValue('width')), parseInt(window.getComputedStyle(display, null).getPropertyValue('height')));
-    // start running
-    is_running = true;
-    tick_last = new Date();
-    onLoop();
+    // start rendering
     is_rendering = true;
     frame_last = new Date();
     onRenderLoop();
-    loadGameData();
-    // bogus video test
-    renderer.loadImageURL('test', 'data/sprites/test.png');
-    renderer.createSprite('test', 16, 16);
-    renderer.setVirtualSize(1920, 1080);
+    // load our game data
+    loadGameData().then(function() {
+      renderer.createSprite('anim', 16, 16);
+      renderer.setVirtualSize(1920, 1080);
+      // start our logic loop
+      is_running = true;
+      tick_last = new Date();
+      onLoop();
+    });
   }
 
   return {
