@@ -1,4 +1,27 @@
 {
   name: "Player",
-  sprite: "anim"
+  sprite: "player:player:walk",
+  // my, what an interesting name!
+  onConception: function() {
+    /*this.head = game.createSprite("player:head");
+    this.torso = game.createSprite("player:torso");
+    this.legs = game.createSprite("player:legs");*/
+    // attach head to torso
+    //this.head.attach(this.torso);
+    // attach torso to legs
+    //this.torso.attach(this.legs);
+  },
+  onBirth: function() {
+  },
+  test_var: 0,
+  onThink: function() {
+    if (this.test_var == 0) {
+      this.sprite.setSet("walk");
+      this.test_var = 1;
+    } else  {
+      this.sprite.setSet("stand");
+      this.test_var = 0;
+    }
+    this.sprite.x += .1;
+  }
 }

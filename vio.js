@@ -101,7 +101,13 @@ ktk.rndr = (function() {
       var end = getQuadrantIntersection(virtual.x + screen.w, virtual.y + screen.h);
       for (var i in quadrants[start.x][start.y].sprites) {
         var sprite = quadrants[start.x][start.y].sprites[i];
-        context.drawImage(images[sprite.image], sprite.x, sprite.y);
+        // TODO: probably have a "getImage" function that returns a dummy image if the file isn't loaded yet?
+        if (images[sprite.image]) {
+          var frame = sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames[sprite.frame];
+          context.drawImage(images[sprite.image], frame.x, frame.y, frame.w, frame.h, sprite.x, sprite.y, frame.w, frame.h);
+          // TODO: set sprite.frame in engine's onTick!
+          //context.drawImage(images[sprite.image], sprite.frame.x, sprite.frame.y, sprite.frame.w, sprite.frame.h, sprite.x, sprite.y, sprite.frame.w, sprite.frame.h);
+        }
       }
       for (var x = start.x; x != end.x; x++) {
         for (var y = start.y; y != end.y; y++) {
@@ -147,12 +153,16 @@ ktk.rndr = (function() {
     quadrants[x][y].sprites.push(sprite);
     console.log('added sprite to ' + x + 'x' + y);
   };
+  function removeSpriteFromQuadrant(sprite) {
+    quadrants[sprite.quadrant.x][sprite.quadrant.y].sprites.splice(sprite.quadrant.index, 1);
+    sprite.quadrant.index = sprite.quadrant.x = sprite.quadrant.y = -1;
+  };
   function moveSpriteToQuadrant(sprite) {
     var inter = getQuadrantIntersection(sprite.x, sprite.y);
     if (sprite.quadrant.x == inter.x && sprite.quadrant.y == inter.y) {
       return;
     }
-    quadrants[sprite.quadrant.x][sprite.quadrant.y].sprites.splice(sprite.quadrant.index, 1);
+    removeSpriteFromQuadrant(sprite);
     addSpriteToQuadrant(sprite, inter.x, inter.y);
   };
   function getQuadrantIntersection(x, y) {
@@ -176,18 +186,48 @@ ktk.rndr = (function() {
     this.id = 0;
     this.x = x;
     this.y = y;
+    this.image = image;
+    this.anim = '';
+    this.set = '';
+    this.frame = 0;
     this.quadrant = {
       x: 0,
       y: 0,
       index: 0
     };
-    this.image = image;
     //
-    this.setImage = function(image) {
-      this.image = image;
+    this.detach = function() {
+      if (!this.parent) return;
+      var i = this.parent.children.indexOf(this);
+      if (i != 1) this.parent.children.splice(i, 1);
+      this.parent = null;
+    };
+    this.attach = function(parent) {
+      if (this.quadrant.index != -1) {
+        removeSpriteFromQuadrant(sprite);
+      }
+      this.detach();
+      this.parent = parent;
+      this.parent.children.push(this);
+    };
+    this.setAnim = function(anim) {
+      this.anim = anim;
+    };
+    this.setSet = function(set) {
+      this.set = set;
+    };
+    this.setFrame = function(frame) {
+      this.frame = frame;
+    };
+    this.incFrame = function() {
+      this.frame += 1;
+      // TODO: on sprite data load, rebuild data to be a fairly basic set of arrays with all the pertinent data stored in the frame object.
+      //if (this.frame >= sprite_data[this.anim][this.set].length) this.frame = 0;
+    };
+    this.decFrame = function(frame) {
+      this.frame -= 1;
     };
   };
-
   /* ================ PUBLIC ================ */
   return {
     fromElement: function(ele) {
@@ -213,16 +253,36 @@ ktk.rndr = (function() {
       virtual.x = x;
       virtual.y = y;
     },
-    loadSprite: function(name) {
+    loadSpriteData: function(name) {
+      name = name.split(":")[0];
       return new Promise(function(resolve, reject) {
         ktk.Filer.load('data/sprites/'+name+'.json').then(function(data) {
-          // TODO: do somethin' wit it
+          // THIS IS REALLY NASTY (basically we're setting frames to inherit properties from set>animation>conf -- perhaps if we did something like "Object.assign(..frame.., (frame[...]->...), set.Conf, anim.conf, global.conf)"
+          var sprite_datum = JSON.parse(data);
+          sprite_datum.Img = sprite_datum.Img || {};
+          sprite_datum.Conf = sprite_datum.Conf || {};
+          for (var anim_name in sprite_datum["Animations"]) {
+            var anim = sprite_datum["Animations"][anim_name];
+            anim.Conf = anim.Conf || {};
+            for (var set_name in anim["Sets"]) {
+              var set = anim["Sets"][set_name];
+              set.Conf = set.Conf || {};
+              for (var frame_idx in set["Frames"]) {
+                var frame = set["Frames"][frame_idx];
+                var frame_obj = { x: frame[0] || 0, y: frame[1] || 0, w: frame[2] || 16, h: frame[3] || 16, t: frame[4] || 100 };
+                Object.assign(frame_obj, sprite_datum.Conf, anim.Conf, set.Conf, frame_obj);
+                // replace old array with actual frame object
+                set["Frames"][frame_idx] = frame_obj;
+              }
+            }
+          }
+          sprite_data[name] = sprite_datum;
         }, function(error) {
           reject(error);
         }).then(function() {
           if (typeof images[name] === 'undefined') {
             images[name] = new Image();
-            images[name].src = 'data/sprites/'+name+'.png';
+            images[name].src = 'data/sprites/'+sprite_data[name].Img+'.png';
           }
           resolve("loaded");
         });
@@ -233,8 +293,12 @@ ktk.rndr = (function() {
       images[name] = new Image();
       images[name].src = url;
     },
-    createSprite: function(image, x, y) {
-      var sprite = new Sprite(image, x, y);
+    createSprite: function(name, x, y) {
+      var parts = name.split(":");
+      var sprite = new Sprite(parts[0], x, y);
+      sprite.anim = parts[1] ? parts[1] : '';
+      sprite.set = parts[2] ? parts[2] : '';
+      sprite.frame = parts[3] ? parseInt(parts[3]) : 0;
       setupSprite(sprite);
       return sprite;
     },
@@ -279,6 +343,8 @@ ktk.vio = (function() {
   // 60 fps? Should we even design the engine to have a separate tick v. frame update?
   var framerate = (1000 / 60);
   var frame_last = 0;
+  //
+  var state = null;
   /* ** file loading ? ** */
   classes_pending = [];
 
@@ -287,6 +353,30 @@ ktk.vio = (function() {
     objects: []
   };
 
+  /* ==== State ==== */
+  var MenuState = {
+    onTick: function(elapsed) {
+    }
+  };
+  var LobbyState = {
+  };
+  var TravelState = {
+  };
+  var GameState = {
+  };
+  var TestState = {
+    local_objects: [],
+    onInit: function() {
+      renderer.setVirtualSize(1920, 1080);
+
+      this.local_objects.push(createObject("player"));
+    },
+    onTick: function(elapsed) {
+      for (var i in game.objects) {
+        game.objects[i].onThink();
+      }
+    }
+  };
   /* ==== Class load/create ==== */
   function loadClasses(names) {
     return new Promise(function(resolve, reject) {
@@ -308,7 +398,7 @@ ktk.vio = (function() {
     }).then(function() {
       if (typeof game.classes[name].sprite !== 'undefined') {
         console.log('Loading sprite "' +game.classes[name].sprite+ '"...');
-        renderer.loadSprite(game.classes[name].sprite).then(function(ok) {
+        renderer.loadSpriteData(game.classes[name].sprite).then(function(ok) {
           console.log(ok);
         }, function(err) {
           console.log(err);
@@ -337,11 +427,19 @@ ktk.vio = (function() {
   }
   /* ==== Objects ==== */
   function createObject(name) {
+    var object = {};
     if (typeof game.classes[name] === 'undefined') {
       console.log('Error, class ' + name + ' does not exist!');
-      return {};
+    } else {
+      object = Object.create(game.classes[name]);
     }
-    return Object.create(game.classes[name]);
+    // TODO: game object id
+    if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 8, 8);
+    if (object.onConception) object.onConception();
+    game.objects.push(object);
+    if (object.onBirth) object.onBirth();
+
+    return object;
   }
   /* ==== Game Logic ==== */
   function loadGameData() {
@@ -370,6 +468,7 @@ ktk.vio = (function() {
   /* ==== Tick and Render ==== */
   function onTick(elapsed) {
     // probably use a state machine?
+    state.onTick(elapsed);
   }
   function onRender() {
     renderer.doRender();
@@ -411,11 +510,11 @@ ktk.vio = (function() {
     onRenderLoop();
     // load our game data
     loadGameData().then(function() {
-      renderer.createSprite('anim', 16, 16);
-      renderer.setVirtualSize(1920, 1080);
       // start our logic loop
       is_running = true;
       tick_last = new Date();
+      state = TestState;
+      state.onInit();
       onLoop();
     });
   }
