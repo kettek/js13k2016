@@ -33,6 +33,34 @@ Engine Structure
   * loadGameData
     * Loads the file "data/game.json" and
       * starts loading the necessary data files
+
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Game State Logic
+````````````````````````````````
+  * Menu
+    * Start Game
+      * Begin NetStart
+    * Join Game
+      * Begin NetJoin
+  * NetStart
+    * set up WebRTC stuff
+    * start NetJoin to ourself
+  * NetService
+    *
+  * NetJoin
+    * connect to server
+    * receive pertinent information:
+      * Our Player ID
+      * All Players
+      * All entities on the map
+      * etc
+    * On finish, switch to NetGame
+  * NetGame
+    * Handle user keypresses/commands and send to server
+    * Locally predict our movement
+    * on receive of data, let server know the last packet ID received
+    *
+    * Start ticking entities and watevs?
 ============================================================================= */ 
 
 var ktk = ktk || {};
@@ -73,15 +101,21 @@ The render has built-in rendering optimizations! This is dictated by a "virtual 
 */
 ktk.rndr = (function() {
   /* ================ PRIVATE ================ */
+  var target = { w: 320, h: 160 };
   var screen = { w: 0, h: 0 };
   var virtual = { w: 0, h: 0, x: 0, y: 0 };
+  var f_images = {}; // flipped images
   var images = {};
   var sprite_data = {};
   var sprites = [];
   var quadrants = [];
   // 1. find our rendering type
   var type = 'null';
+  var display = null;
   var canvas = document.createElement('canvas');
+  var o_canvas = document.createElement('canvas');
+  var o_context = o_canvas.getContext('2d');
+  o_canvas.style.display = 'none';
   if (canvas.getContext) {
     type = 'canvas';
   } else {
@@ -90,13 +124,44 @@ ktk.rndr = (function() {
   // 2. initialize renderer
   if (type == 'canvas') {
     var context = null;
-    function initDisplay(display) {
-      canvas.width = window.getComputedStyle(display, null).getPropertyValue('width');
-      canvas.height = window.getComputedStyle(display, null).getPropertyValue('height');
+    function initDisplay(display_) {
+      display = display_;
       context = canvas.getContext('2d');
       display.appendChild(canvas);
+      window.addEventListener('resize', handleDisplayResize, false);
+      // add our offscreen canvas
+      display.appendChild(o_canvas);
     }
-    function onRender() {
+    function setSize(w, h) {
+      screen.w = w;
+      screen.h = h;
+      if (virtual.w < w || virtual.h < h) setupQuadrants();
+      canvas.width = w;
+      canvas.height = h;
+    }
+    function handleDisplayResize() {
+      var win = window.getComputedStyle(display, null);
+      var d_w = parseInt(win.getPropertyValue('width'));
+      var d_h = parseInt(win.getPropertyValue('height'));
+
+      screen.w = d_w;
+      screen.h = d_h;
+
+      var ratio = Math.floor(Math.min(d_w / target.w, d_h / target.h));
+      var t_w = target.w * ratio;
+      var t_h = target.h * ratio;
+      if (virtual.w < target.w || virtual.h < target.h) setupQuadrants();
+      canvas.width = target.w;
+      canvas.height = target.h;
+      canvas.style.marginLeft = (screen.w - t_w)/2+'px';
+      canvas.style.marginTop = (screen.h - t_h)/2+'px';
+      canvas.style.width = t_w+'px';
+      canvas.style.height = t_h+'px';
+      canvas.style.border = '1px solid red';
+      //setSize(t_w, t_h);
+    }
+    function onRender(delta) {
+      context.clearRect(0, 0, canvas.width, canvas.height);
       var start = getQuadrantIntersection(virtual.x - screen.w, virtual.y - screen.h);
       var end = getQuadrantIntersection(virtual.x + screen.w, virtual.y + screen.h);
       for (var i in quadrants[start.x][start.y].sprites) {
@@ -104,9 +169,24 @@ ktk.rndr = (function() {
         // TODO: probably have a "getImage" function that returns a dummy image if the file isn't loaded yet?
         if (images[sprite.image]) {
           var frame = sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames[sprite.frame];
-          context.drawImage(images[sprite.image], frame.x, frame.y, frame.w, frame.h, sprite.x, sprite.y, frame.w, frame.h);
-          // TODO: set sprite.frame in engine's onTick!
-          //context.drawImage(images[sprite.image], sprite.frame.x, sprite.frame.y, sprite.frame.w, sprite.frame.h, sprite.x, sprite.y, sprite.frame.w, sprite.frame.h);
+          // increase our frame if enough time has passed
+          sprite.elapsed += delta;
+          while (sprite.elapsed >= frame.t) {
+            sprite.elapsed -= frame.t;
+            if (sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames.length-1 <= sprite.frame) {
+              sprite.frame = 0;
+            } else {
+              sprite.frame++;
+            }
+            frame = sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames[sprite.frame];
+          }
+          // FIXME: the entire sprite flipping code is bad
+          // draw it
+          if (sprite.flip) {
+            context.drawImage(f_images[sprite.image], (f_images[sprite.image].width-frame.w)-frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x), Math.floor(sprite.y), frame.w, frame.h);
+          } else {
+            context.drawImage(images[sprite.image], frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x), Math.floor(sprite.y), frame.w, frame.h);
+          }
         }
       }
       for (var x = start.x; x != end.x; x++) {
@@ -190,6 +270,8 @@ ktk.rndr = (function() {
     this.anim = '';
     this.set = '';
     this.frame = 0;
+    this.elapsed = 0;
+    this.flip = false;
     this.quadrant = {
       x: 0,
       y: 0,
@@ -232,15 +314,10 @@ ktk.rndr = (function() {
   return {
     fromElement: function(ele) {
       initDisplay(ele);
+      handleDisplayResize();
       return this;
     },
-    setSize: function(w, h) {
-      screen.w = w;
-      screen.h = h;
-      if (virtual.w < w || virtual.h < h) setupQuadrants();
-      canvas.width = w;
-      canvas.height = h;
-    },
+    setSize: setSize,
     getSize: function() {
       return {w: canvas.width, h: canvas.height};
     },
@@ -281,8 +358,20 @@ ktk.rndr = (function() {
           reject(error);
         }).then(function() {
           if (typeof images[name] === 'undefined') {
+            // FIXME: this is pretty ugly -- we should probably load the data via Filer instead of using src directly
+            f_images[name] = new Image();
             images[name] = new Image();
-            images[name].src = 'data/sprites/'+sprite_data[name].Img+'.png';
+            images[name].onload = function(e) {
+              o_canvas.width = images[name].width;
+              o_canvas.height = images[name].height;
+              o_context.save();
+              o_context.scale(-1,1);
+              o_context.drawImage(images[name], -images[name].width, 0);
+              o_context.restore();
+              f_images[name].src = o_canvas.toDataURL();
+            };
+            f_images[name].src = 'data/sprites/'+sprite_data[name].Img+'.png';
+            images[name].src = f_images[name].src;
           }
           resolve("loaded");
         });
@@ -352,7 +441,11 @@ ktk.vio = (function() {
     classes: [],
     objects: []
   };
-
+  /* ==== Game stuff ==== */
+  function addForce(object, x, y) {
+    object.vel.x += x;
+    object.vel.y += y;
+  }
   /* ==== State ==== */
   var MenuState = {
     onTick: function(elapsed) {
@@ -418,7 +511,7 @@ ktk.vio = (function() {
         console.log(name + ': Warning, inherited class ' + evaluated.inherits + ' does not exist!');
         // ... load?
       } else {
-        evaluated = Object.assign({}, game.classes[evaluated.inherits], evaluated);
+        evaluated = Object.assign({}, {v:{x:0,y:0},f:0,}, game.classes[evaluated.inherits], evaluated);
       }
     } else {
     }
@@ -434,7 +527,7 @@ ktk.vio = (function() {
       object = Object.create(game.classes[name]);
     }
     // TODO: game object id
-    if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 8, 8);
+    if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16);
     if (object.onConception) object.onConception();
     game.objects.push(object);
     if (object.onBirth) object.onBirth();
@@ -470,15 +563,16 @@ ktk.vio = (function() {
     // probably use a state machine?
     state.onTick(elapsed);
   }
-  function onRender() {
-    renderer.doRender();
+  function onRender(delta) {
+    renderer.doRender(delta);
   }
   /* ==== Loops ==== */
   function onRenderLoop() {
     if (!is_rendering) return;
     var frame_current = new Date();
     var frame_delta = frame_current - frame_last;
-    onRender();
+    frame_last = frame_current;
+    onRender(frame_delta);
     var wait_time = framerate - (frame_current - new Date());
     if (wait_time > framerate) wait_time = framerate;
     setTimeout(onRenderLoop, wait_time);
@@ -490,6 +584,7 @@ ktk.vio = (function() {
     var tick_delta = tick_current - tick_last;
     // begin ticking!
     accumulator += tick_delta;
+    tick_last = tick_current;
     while (accumulator >= tickrate) {
       onTick(tickrate);
       accumulator -= tickrate;
@@ -503,7 +598,6 @@ ktk.vio = (function() {
     // get display
     display = document.getElementById('display');
     renderer = ktk.rndr.fromElement(display);
-    renderer.setSize(parseInt(window.getComputedStyle(display, null).getPropertyValue('width')), parseInt(window.getComputedStyle(display, null).getPropertyValue('height')));
     // start rendering
     is_rendering = true;
     frame_last = new Date();

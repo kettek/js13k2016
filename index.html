@@ -3,11 +3,24 @@
 <head>
 <script type="text/javascript" src="vio.js"></script>
 <style type="text/css">
+html,body {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
 #display {
   display: block;
-  background-color: #000;
-  width: 640px;
-  height: 360px;
+  background-color: #999;
+  width: 100%;
+  height: 100%;
+}
+canvas {
+  image-rendering: crisp-edges;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: optimize-contrast;
+  -ms-interpolation-mode: nearest-neighbor;
 }
 </style>
 </head>

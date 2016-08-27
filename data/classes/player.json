@@ -13,15 +13,14 @@
   },
   onBirth: function() {
   },
-  test_var: 0,
+  is_walking: 0,
+  speed: 0,
+  faceDirection: function(dir) {
+    this.sprite.flip = 1;
+  },
   onThink: function() {
-    if (this.test_var == 0) {
-      this.sprite.setSet("walk");
-      this.test_var = 1;
-    } else  {
-      this.sprite.setSet("stand");
-      this.test_var = 0;
+    if (this.is_walking) {
+      this.v.x += this.f[0]*this.speed;
     }
-    this.sprite.x += .1;
   }
 }
