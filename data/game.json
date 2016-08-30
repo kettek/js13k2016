@@ -3,6 +3,7 @@
   classes: [
     "entity",
     "player",
+    "birb",
     "demon"
   ]
 }

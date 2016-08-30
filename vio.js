@@ -68,41 +68,21 @@ Game State Logic
           * update entities with received server data
           * Locally predict velocities of entities
           * if "travel" is received, switch to TravelState
+
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Mid-game Netcode Flow
+````````````````````````````````
+[server]                         [client]
+handleNetData   <-------------- send {CMD} (MOVE dir, ACT id, LEAVE, CHAT, etc.)
+ check net->player id
+  handlePlayerInput(id, CMD)
+run world                       run world (simulate velocities)
+ send change deltas ----------->  update objects with deltas
+                                  ---- OR IF ALSO SERVER ----
+                                        do nothing
 ============================================================================= */ 
 
 var ktk = ktk || {};
-
-ktk.getCallerName = function() {
-  var name = ktk.getCallerName.caller.toString();
-  name = name.substr('function '.length);
-  name = name.substr(0, name.indexOf('('));
-  name = name + '> ';
-  return name;
-};
-
-Object.defineProperty(this, 'fn', {
-  get: ktk.getCallerName
-});
-
-var logr = (function() {
-  var depth = 0;
-  return function LOG() {
-    if (arguments.length > 0) {
-      var args = Array.prototype.slice.call(arguments);
-      var name = LOG.caller.toString();
-      name = name.substr('function '.length);
-      name = name.substr(0, name.indexOf('('));
-      args.unshift(name+'> ');
-      args.unshift(Array(depth).join(' '));
-      console.log.apply(console, args);
-    } 
-    return function(inc) {
-      depth += inc;
-      if (depth < 0) depth = 0;
-    }
-  }
-})();
-
 /*
 The render has built-in rendering optimizations! This is dictated by a "virtual size" that splits the map into sections and places sprites within those sections for rendering. The quadrant sizes are dictated by (canvas.width*2 x canvas.height*2).
 */
@@ -139,13 +119,6 @@ ktk.rndr = (function() {
       // add our offscreen canvas
       display.appendChild(o_canvas);
     }
-    function setSize(w, h) {
-      screen.w = w;
-      screen.h = h;
-      if (virtual.w < w || virtual.h < h) setupQuadrants();
-      canvas.width = w;
-      canvas.height = h;
-    }
     function handleDisplayResize() {
       var win = window.getComputedStyle(display, null);
       var d_w = parseInt(win.getPropertyValue('width'));
@@ -165,7 +138,6 @@ ktk.rndr = (function() {
       canvas.style.width = t_w+'px';
       canvas.style.height = t_h+'px';
       canvas.style.border = '1px solid red';
-      //setSize(t_w, t_h);
     }
     function onRender(delta) {
       context.clearRect(0, 0, canvas.width, canvas.height);
@@ -324,7 +296,6 @@ ktk.rndr = (function() {
       handleDisplayResize();
       return this;
     },
-    setSize: setSize,
     getSize: function() {
       return {w: canvas.width, h: canvas.height};
     },
@@ -443,11 +414,13 @@ ktk.vio = (function() {
   //
   var state = null;
   /* ** file loading ? ** */
+  var classes = [];
   classes_pending = [];
 
   var game = {
-    classes: [],
-    objects: []
+    players: [], // id: {name, stats, object}
+    objects: [],
+    map: {}
   };
   /* ==== Game stuff ==== */
   function addForce(object, x, y) {
@@ -473,7 +446,7 @@ ktk.vio = (function() {
     onInit: function() {
       renderer.setVirtualSize(1920, 1080);
 
-      this.local_objects.push(createObject("player"));
+      this.local_objects.push(createObject("birb"));
     },
     onTick: function(elapsed) {
       for (var i in game.objects) {
@@ -500,9 +473,9 @@ ktk.vio = (function() {
     }, function(error) {
       reject("Could not load class '" + name + "': " + error);
     }).then(function() {
-      if (typeof game.classes[name].sprite !== 'undefined') {
-        console.log('Loading sprite "' +game.classes[name].sprite+ '"...');
-        renderer.loadSpriteData(game.classes[name].sprite).then(function(ok) {
+      if (typeof classes[name].sprite !== 'undefined') {
+        console.log('Loading sprite "' +classes[name].sprite+ '"...');
+        renderer.loadSpriteData(classes[name].sprite).then(function(ok) {
           console.log(ok);
         }, function(err) {
           console.log(err);
@@ -513,29 +486,29 @@ ktk.vio = (function() {
     });
   }
   function loadClass(name, code) {
-    if (typeof game.classes[name] !== 'undefined') {
+    if (typeof classes[name] !== 'undefined') {
       console.log('class ' + name + ' already exists, overwriting');
     }
     var evaluated = eval('('+code+')');
     if (typeof evaluated.inherits !== 'undefined') {
-      if (typeof game.classes[evaluated.inherits] === 'undefined') {
+      if (typeof classes[evaluated.inherits] === 'undefined') {
         console.log(name + ': Warning, inherited class ' + evaluated.inherits + ' does not exist!');
         // ... load?
       } else {
-        evaluated = Object.assign({}, {v:{x:0,y:0},f:0,}, game.classes[evaluated.inherits], evaluated);
+        evaluated = Object.assign({}, {v:{x:0,y:0},f:0,}, classes[evaluated.inherits], evaluated);
       }
     } else {
     }
-    game.classes[name] = evaluated;
+    classes[name] = evaluated;
     console.log('...' + name);
   }
   /* ==== Objects ==== */
   function createObject(name) {
     var object = {};
-    if (typeof game.classes[name] === 'undefined') {
+    if (typeof classes[name] === 'undefined') {
       console.log('Error, class ' + name + ' does not exist!');
     } else {
-      object = Object.create(game.classes[name]);
+      object = Object.create(classes[name]);
     }
     // TODO: game object id
     if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16);
