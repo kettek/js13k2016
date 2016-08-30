@@ -45,22 +45,29 @@ Game State Logic
   * NetStart
     * set up WebRTC stuff
     * start NetJoin to ourself
-  * NetService
-    *
   * NetJoin
     * connect to server
     * receive pertinent information:
       * Our Player ID
       * All Players
-      * All entities on the map
       * etc
     * On finish, switch to NetGame
   * NetGame
-    * Handle user keypresses/commands and send to server
-    * Locally predict our movement
-    * on receive of data, let server know the last packet ID received
-    *
-    * Start ticking entities and watevs?
+    * Begins on TravelState
+      * TravelState clears the game world, creates the map, and places entities in it
+      * on finish, GameState is switched to
+    * GameState
+      * if server
+        * handle received player commands
+        * tick the world
+        * send world delta for each player
+        * if "travel" is triggered, send Travel to all clients and switch to TravelState
+      * if client
+        * Handle user keypresses/commands and send to server
+        * if not server
+          * update entities with received server data
+          * Locally predict velocities of entities
+          * if "travel" is received, switch to TravelState
 ============================================================================= */ 
 
 var ktk = ktk || {};
@@ -168,17 +175,17 @@ ktk.rndr = (function() {
         var sprite = quadrants[start.x][start.y].sprites[i];
         // TODO: probably have a "getImage" function that returns a dummy image if the file isn't loaded yet?
         if (images[sprite.image]) {
-          var frame = sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames[sprite.frame];
+          var frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
           // increase our frame if enough time has passed
           sprite.elapsed += delta;
           while (sprite.elapsed >= frame.t) {
             sprite.elapsed -= frame.t;
-            if (sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames.length-1 <= sprite.frame) {
+            if (sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F.length-1 <= sprite.frame) {
               sprite.frame = 0;
             } else {
               sprite.frame++;
             }
-            frame = sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames[sprite.frame];
+            frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
           }
           // FIXME: the entire sprite flipping code is bad
           // draw it
@@ -335,21 +342,22 @@ ktk.rndr = (function() {
       return new Promise(function(resolve, reject) {
         ktk.Filer.load('data/sprites/'+name+'.json').then(function(data) {
           // THIS IS REALLY NASTY (basically we're setting frames to inherit properties from set>animation>conf -- perhaps if we did something like "Object.assign(..frame.., (frame[...]->...), set.Conf, anim.conf, global.conf)"
-          var sprite_datum = JSON.parse(data);
-          sprite_datum.Img = sprite_datum.Img || {};
-          sprite_datum.Conf = sprite_datum.Conf || {};
-          for (var anim_name in sprite_datum["Animations"]) {
-            var anim = sprite_datum["Animations"][anim_name];
-            anim.Conf = anim.Conf || {};
-            for (var set_name in anim["Sets"]) {
-              var set = anim["Sets"][set_name];
-              set.Conf = set.Conf || {};
-              for (var frame_idx in set["Frames"]) {
-                var frame = set["Frames"][frame_idx];
+          // using eval to skip extra chars required by JSON.parse
+          var sprite_datum = eval('('+data+')');
+          sprite_datum.I = sprite_datum.I || name;
+          sprite_datum.C = sprite_datum.C || {};
+          for (var anim_name in sprite_datum.A) {
+            var anim = sprite_datum.A[anim_name];
+            anim.C = anim.C || {};
+            for (var set_name in anim.S) {
+              var set = anim.S[set_name];
+              set.C = set.C || {};
+              for (var frame_idx in set.F) {
+                var frame = set.F[frame_idx];
                 var frame_obj = { x: frame[0] || 0, y: frame[1] || 0, w: frame[2] || 16, h: frame[3] || 16, t: frame[4] || 100 };
-                Object.assign(frame_obj, sprite_datum.Conf, anim.Conf, set.Conf, frame_obj);
+                Object.assign(frame_obj, sprite_datum.C, anim.C, set.C, frame_obj);
                 // replace old array with actual frame object
-                set["Frames"][frame_idx] = frame_obj;
+                set.F[frame_idx] = frame_obj;
               }
             }
           }
@@ -370,7 +378,7 @@ ktk.rndr = (function() {
               o_context.restore();
               f_images[name].src = o_canvas.toDataURL();
             };
-            f_images[name].src = 'data/sprites/'+sprite_data[name].Img+'.png';
+            f_images[name].src = 'data/sprites/'+sprite_data[name].I+'.png';
             images[name].src = f_images[name].src;
           }
           resolve("loaded");
@@ -452,10 +460,13 @@ ktk.vio = (function() {
     }
   };
   var LobbyState = {
+    // herein lies joining a lobby and creating TravelState
   };
   var TravelState = {
+    // herein lies connecting to a given server and resetting world objects
   };
   var GameState = {
+    // herein lies the game physics state, calls TravelState on map change
   };
   var TestState = {
     local_objects: [],

@@ -1,18 +1,17 @@
 {
-  "Img": "player",
-  "Conf": {
+  C: {
     "w": 16,
     "h": 16,
     "t": 50
   },
-  "Animations": {
+  A: {
     "player": {
-      "Sets": {
+      S: {
         "walk": {
-          "Conf": {
+          C: {
             "y": 0
           },
-          "Frames": [
+          F: [
             [0],
             [16],
             [32],
