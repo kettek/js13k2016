@@ -623,7 +623,8 @@ ktk.vio = (function() {
     console.log('...' + name);
   }
   /* ==== Objects ==== */
-  function createObject(name, global) {
+  //function createObject(name, global) {
+  function createObject(name) {
     var object = {};
     if (typeof classes[name] === 'undefined') {
       console.log('Error, class ' + name + ' does not exist!');
@@ -631,8 +632,11 @@ ktk.vio = (function() {
       object = Object.create(classes[name]);
     }
     // TODO: game object id
-    if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16, global);
-    if (object.onConception) object.onConception(object);
+    //if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16, global);
+    if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16);
+    var args = Array.prototype.slice.call(arguments, 1);
+    args.unshift(object);
+    if (object.onConception) object.onConception.apply(object, args);
     game.objects.push(object);
     if (object.onBirth) object.onBirth(object);
 

@@ -4,7 +4,7 @@
   sprite: "birb:birb:run",
   sprites: [],
   onConception: function(_) {
-    var t = createObject("text");
+    var t = createObject("text", "$!#%");
     t.attach(this);
   },
   onBirth: function(_) {
