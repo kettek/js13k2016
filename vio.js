@@ -397,6 +397,8 @@ ktk.Filer = (function() {
 })();
 
 ktk.vio = (function() {
+  /* ** logic ** */
+  var is_server = false;
   /* ** display ** */
   var display = null;
   var renderer = null;
@@ -440,13 +442,35 @@ ktk.vio = (function() {
   };
   var GameState = {
     // herein lies the game physics state, calls TravelState on map change
+    onTick: function(elapsed) {
+      if (is_server) {
+        for (var i in game.objects) {
+          game.objects[i].onThink();
+          /*
+          if object's velocity, position, animation, frame, or otherwise has changed
+            iterate over each player and calculate the delta of the player's last packet data with the above changes in mind. These calculations are then added as Messages to the message queue?
+          */
+        }
+        for (var i in game.players) {
+          if (i != game.this_player) {
+            // ???
+          }
+        }
+      } else {
+        /*
+        check for pending game packets and update our objects in accordance with them
+        */
+        for (var i in game.objects) {
+          // run projected velocity
+        }
+      }
+    }
   };
   var TestState = {
     local_objects: [],
     onInit: function() {
       renderer.setVirtualSize(1920, 1080);
-
-      this.local_objects.push(createObject("birb"));
+      createObject("birb");
     },
     onTick: function(elapsed) {
       for (var i in game.objects) {
