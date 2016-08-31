@@ -1,0 +1,12 @@
+{
+  sprite: "fonts:small:0:0",
+  n: "",
+  set: function(text) {
+    var t = text.split('');
+    for (var i in this.sprite.children) this.sprite.children[i].detach();
+    for (var i in t) {
+      var s = renderer.createSprite("fonts:small:0:"+t[i].charCodeAt(0), i*16, 0, true);
+      this.sprite.attach(s);
+    }
+  }
+}

@@ -94,7 +94,7 @@ ktk.rndr = (function() {
   var f_images = {}; // flipped images
   var images = {};
   var sprite_data = {};
-  var sprites = [];
+  var sprites = []; // global sprites
   var quadrants = [];
   // 1. find our rendering type
   var type = 'null';
@@ -148,16 +148,18 @@ ktk.rndr = (function() {
         // TODO: probably have a "getImage" function that returns a dummy image if the file isn't loaded yet?
         if (images[sprite.image]) {
           var frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
-          // increase our frame if enough time has passed
-          sprite.elapsed += delta;
-          while (sprite.elapsed >= frame.t) {
-            sprite.elapsed -= frame.t;
-            if (sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F.length-1 <= sprite.frame) {
-              sprite.frame = 0;
-            } else {
-              sprite.frame++;
+          if (sprite.animate) {
+            // increase our frame if enough time has passed
+            sprite.elapsed += delta;
+            while (sprite.elapsed >= frame.t) {
+              sprite.elapsed -= frame.t;
+              if (sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F.length-1 <= sprite.frame) {
+                sprite.frame = 0;
+              } else {
+                sprite.frame++;
+              }
+              frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
             }
-            frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
           }
           // FIXME: the entire sprite flipping code is bad
           // draw it
@@ -242,6 +244,8 @@ ktk.rndr = (function() {
     addSpriteToQuadrant(sprite, inter.x, inter.y);
   };
   function Sprite(image, x, y) {
+    this.parent = null;
+    this.children = [];
     this.id = 0;
     this.x = x;
     this.y = y;
@@ -251,6 +255,7 @@ ktk.rndr = (function() {
     this.frame = 0;
     this.elapsed = 0;
     this.flip = false;
+    this.animate = true;
     this.quadrant = {
       x: 0,
       y: 0,
@@ -264,7 +269,10 @@ ktk.rndr = (function() {
       this.parent = null;
     };
     this.attach = function(parent) {
-      if (this.quadrant.index != -1) {
+      if (this.id != 0) {
+        sprite_ids.push(sprite_id);
+        sprites.splice(sprite.id, 1);
+      } else if (this.quadrant.index != -1) {
         removeSpriteFromQuadrant(sprite);
       }
       this.detach();
@@ -361,14 +369,34 @@ ktk.rndr = (function() {
       images[name] = new Image();
       images[name].src = url;
     },
-    createSprite: function(name, x, y) {
+    getSpriteId: function() {
+      var id = sprites.length;
+      if (sprite_ids.length > 0) {
+        id = sprite_ids.shift();
+      }
+      return id;
+    },
+    createSprite: function(name, x, y, global) {
       var parts = name.split(":");
       var sprite = new Sprite(parts[0], x, y);
       sprite.anim = parts[1] ? parts[1] : '';
       sprite.set = parts[2] ? parts[2] : '';
       sprite.frame = parts[3] ? parseInt(parts[3]) : 0;
-      setupSprite(sprite);
+      if (global) {
+        sprite.id = getSpriteId();
+        sprites.push(sprite);
+      } else {
+        setupSprite(sprite);
+      }
       return sprite;
+    },
+    deleteSprite: function(sprite) {
+      if (sprite.id != 0) {
+        sprite_ids.push(sprite_id);
+        sprites.splice(sprite.id, 1);
+      } else {
+        removeSpriteFromQuadrant(sprite);
+      }
     },
     doRender: onRender
   };
@@ -397,8 +425,10 @@ ktk.Filer = (function() {
 })();
 
 ktk.vio = (function() {
+  /* ** input ** */
+  var keys = [];
   /* ** logic ** */
-  var is_server = false;
+  var is_server = true;
   /* ** display ** */
   var display = null;
   var renderer = null;
@@ -429,6 +459,27 @@ ktk.vio = (function() {
     object.vel.x += x;
     object.vel.y += y;
   }
+  /* ==== Networking ==== */
+  var handleMessage = function(e) {
+    if (is_server) {
+      // determine message type:
+      //   * TRAVEL
+      //   * CHAT
+      //   * GAME
+      //     * send to game input processing queue
+      //   * QUIT
+    } else {
+      // determine message type:
+      //   * TRAVEL
+      //   * CHAT
+      //   * GAME
+      //   * QUIT
+    }
+  };
+  var nsend = function(type, data) {
+  };
+  var nsendall = function(type, data) {
+  };
   /* ==== State ==== */
   var MenuState = {
     onTick: function(elapsed) {
@@ -442,10 +493,33 @@ ktk.vio = (function() {
   };
   var GameState = {
     // herein lies the game physics state, calls TravelState on map change
+    onInit: function() {
+      renderer.setVirtualSize(1920, 1080);
+      createObject("birb");
+      var a = createObject("text");
+      a.set("wat");
+    },
     onTick: function(elapsed) {
       if (is_server) {
         for (var i in game.objects) {
-          game.objects[i].onThink();
+          if (game.objects[i].onThink) game.objects[i].onThink();
+          // run physics
+          game.objects[i].x += game.objects[i].v.x;
+          game.objects[i].y += game.objects[i].v.y;
+          game.objects[i].sprite.x = game.objects[i].x;
+          game.objects[i].sprite.y = game.objects[i].y;
+          game.objects[i].v.x *= 0.5;
+          game.objects[i].v.y *= 0.5;
+          if (game.objects[i].y < 120) {
+            game.objects[i].v.y += 0.5;
+            game.objects[i].v.y *= 1.5;
+          }
+
+          // potential changes:
+          //   position, velocity, facing, animation, set, frame, state(?), hp, destroy, create
+          //var dirty = game.objects[i].D;
+          //dirty & 1 ? nsendall(4, [i, 0, game.objects[i].x, game.objects[i].y]) : '';
+          //dirty & 2 ? nsendall(4, [i, 1, game.objects[i].v.x, game.objects[i].v.y]) : '';
           /*
           if object's velocity, position, animation, frame, or otherwise has changed
             iterate over each player and calculate the delta of the player's last packet data with the above changes in mind. These calculations are then added as Messages to the message queue?
@@ -456,7 +530,14 @@ ktk.vio = (function() {
             // ???
           }
         }
-      } else {
+      }
+      // client
+      {
+        keys[37] ? nsend(3,0): ''; // left
+        keys[39] ? nsend(3,1): ''; // right
+        keys[38] ? nsend(3,2): ''; // up
+        keys[40] ? nsend(3,3): ''; // down
+        keys[90] ? nsend(3,4): ''; // z
         /*
         check for pending game packets and update our objects in accordance with them
         */
@@ -519,9 +600,10 @@ ktk.vio = (function() {
         console.log(name + ': Warning, inherited class ' + evaluated.inherits + ' does not exist!');
         // ... load?
       } else {
-        evaluated = Object.assign({}, {v:{x:0,y:0},f:0,}, classes[evaluated.inherits], evaluated);
+        evaluated = Object.assign({}, {D:0,x:0,y:0,v:{x:0,y:0},f:0,}, classes[evaluated.inherits], evaluated);
       }
     } else {
+      evaluated = Object.assign({}, {D:0,x:0,y:0,v:{x:0,y:0},f:0,}, evaluated);
     }
     classes[name] = evaluated;
     console.log('...' + name);
@@ -606,6 +688,9 @@ ktk.vio = (function() {
     // get display
     display = document.getElementById('display');
     renderer = ktk.rndr.fromElement(display);
+    // set up keyboard hooks
+    window.addEventListener('keydown', function(e) { keys[e.which] = true; }, false);
+    window.addEventListener('keyup', function(e) { keys[e.which] = false; }, false);
     // start rendering
     is_rendering = true;
     frame_last = new Date();
@@ -615,7 +700,7 @@ ktk.vio = (function() {
       // start our logic loop
       is_running = true;
       tick_last = new Date();
-      state = TestState;
+      state = GameState;
       state.onInit();
       onLoop();
     });

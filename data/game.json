@@ -1,6 +1,7 @@
 {
   title: 'VIOLENCIA',
   classes: [
+    "text",
     "entity",
     "player",
     "birb",

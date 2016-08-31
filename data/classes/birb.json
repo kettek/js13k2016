@@ -6,8 +6,20 @@
   onBirth: function() {
   },
   is_walking: 0,
-  speed: 0,
+  speed: 2,
   onThink: function() {
+    if (keys[37]) {
+      this.v.x -= this.speed;
+      this.sprite.flip = true;
+      this.sprite.animate = true;
+    } else if (keys[39]) {
+      this.v.x += this.speed;
+      this.sprite.flip = false;
+      this.sprite.animate = true;
+    }
+    if (Math.abs(this.v.x) <= 0.2) {
+      this.sprite.animate = false;
+    }
     if (this.is_walking) {
       this.v.x += this.f[0]*this.speed;
     }
