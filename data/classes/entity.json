@@ -1,3 +1,21 @@
 {
-  name: "Entity"
+  F:0,
+  x:0,
+  y:0,
+  v:{x:0,y:0},
+  f:0,
+  P:1,
+  c: [],
+  p: null,
+  attach: function(p) {
+    this.detach();
+    p.c.push(this);
+    this.p = parent;
+  },
+  detach: function() {
+    if (!this.p) return;
+    var i = this.p.c.indexOf(this);
+    if (i != 1) this.p.c.splice(i, 1);
+    this.p = null;
+  }
 }

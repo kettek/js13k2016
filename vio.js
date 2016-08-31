@@ -95,6 +95,7 @@ ktk.rndr = (function() {
   var images = {};
   var sprite_data = {};
   var sprites = []; // global sprites
+  var sprite_ids = [];
   var quadrants = [];
   // 1. find our rendering type
   var type = 'null';
@@ -139,42 +140,51 @@ ktk.rndr = (function() {
       canvas.style.height = t_h+'px';
       canvas.style.border = '1px solid red';
     }
+    function drawSprite(sprite, delta, x, y) {
+      x = x || 0;
+      y = y || 0;
+      if (images[sprite.image]) {
+        var frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
+        if (sprite.animate) {
+          // increase our frame if enough time has passed
+          sprite.elapsed += delta;
+          while (sprite.elapsed >= frame.t) {
+            sprite.elapsed -= frame.t;
+            if (sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F.length-1 <= sprite.frame) {
+              sprite.frame = 0;
+            } else {
+              sprite.frame++;
+            }
+            frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
+          }
+        }
+        // FIXME: the entire sprite flipping code is bad
+        // draw it
+        if (sprite.flip) {
+          context.drawImage(f_images[sprite.image], (f_images[sprite.image].width-frame.w)-frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x+x), Math.floor(sprite.y+y), frame.w, frame.h);
+        } else {
+          context.drawImage(images[sprite.image], frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x+x), Math.floor(sprite.y+y), frame.w, frame.h);
+        }
+      }
+      for (var i in sprite.children) {
+        drawSprite(sprite.children[i], delta, sprite.x, sprite.y);
+      }
+    }
     function onRender(delta) {
       context.clearRect(0, 0, canvas.width, canvas.height);
       var start = getQuadrantIntersection(virtual.x - screen.w, virtual.y - screen.h);
       var end = getQuadrantIntersection(virtual.x + screen.w, virtual.y + screen.h);
       for (var i in quadrants[start.x][start.y].sprites) {
-        var sprite = quadrants[start.x][start.y].sprites[i];
-        // TODO: probably have a "getImage" function that returns a dummy image if the file isn't loaded yet?
-        if (images[sprite.image]) {
-          var frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
-          if (sprite.animate) {
-            // increase our frame if enough time has passed
-            sprite.elapsed += delta;
-            while (sprite.elapsed >= frame.t) {
-              sprite.elapsed -= frame.t;
-              if (sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F.length-1 <= sprite.frame) {
-                sprite.frame = 0;
-              } else {
-                sprite.frame++;
-              }
-              frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
-            }
-          }
-          // FIXME: the entire sprite flipping code is bad
-          // draw it
-          if (sprite.flip) {
-            context.drawImage(f_images[sprite.image], (f_images[sprite.image].width-frame.w)-frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x), Math.floor(sprite.y), frame.w, frame.h);
-          } else {
-            context.drawImage(images[sprite.image], frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x), Math.floor(sprite.y), frame.w, frame.h);
-          }
-        }
+        drawSprite(quadrants[start.x][start.y].sprites[i], delta);
+      }
+      // draw globals
+      for (var i in sprites) {
+        drawSprite(sprites[i], delta);
       }
       for (var x = start.x; x != end.x; x++) {
         for (var y = start.y; y != end.y; y++) {
           for (var i in quadrants[x][y].sprites) {
-            var sprite = quadrants[x][y].sprites[i];
-            context.drawImage(images[sprite.image], sprite.x, sprite.y);
+            drawSprite(quadrants[x][y].sprites[i]);
           }
         }
       }
@@ -255,11 +265,11 @@ ktk.rndr = (function() {
     this.frame = 0;
     this.elapsed = 0;
     this.flip = false;
-    this.animate = true;
+    this.animate = sprite_data[image].C.a;
     this.quadrant = {
       x: 0,
       y: 0,
-      index: 0
+      index: -1
     };
     //
     this.detach = function() {
@@ -270,10 +280,10 @@ ktk.rndr = (function() {
     };
     this.attach = function(parent) {
       if (this.id != 0) {
-        sprite_ids.push(sprite_id);
-        sprites.splice(sprite.id, 1);
+        sprite_ids.push(this.id);
+        sprites.splice(this.id, 1);
       } else if (this.quadrant.index != -1) {
-        removeSpriteFromQuadrant(sprite);
+        removeSpriteFromQuadrant(this);
       }
       this.detach();
       this.parent = parent;
@@ -383,7 +393,7 @@ ktk.rndr = (function() {
       sprite.set = parts[2] ? parts[2] : '';
       sprite.frame = parts[3] ? parseInt(parts[3]) : 0;
       if (global) {
-        sprite.id = getSpriteId();
+        sprite.id = this.getSpriteId();
         sprites.push(sprite);
       } else {
         setupSprite(sprite);
@@ -496,18 +506,24 @@ ktk.vio = (function() {
     onInit: function() {
       renderer.setVirtualSize(1920, 1080);
       createObject("birb");
-      var a = createObject("text");
-      a.set("wat");
     },
     onTick: function(elapsed) {
       if (is_server) {
         for (var i in game.objects) {
-          if (game.objects[i].onThink) game.objects[i].onThink();
+          if (game.objects[i].onThink) game.objects[i].onThink(game.objects[i]);
+          if (!game.objects[i].P) continue;
           // run physics
           game.objects[i].x += game.objects[i].v.x;
           game.objects[i].y += game.objects[i].v.y;
           game.objects[i].sprite.x = game.objects[i].x;
           game.objects[i].sprite.y = game.objects[i].y;
+          for (var j in game.objects[i].c) {
+            var child = game.objects[i].c[j];
+            child.x += game.objects[i].v.x;
+            child.y += game.objects[i].v.y;
+            child.sprite.x = child.x;
+            child.sprite.y = child.y;
+          }
           game.objects[i].v.x *= 0.5;
           game.objects[i].v.y *= 0.5;
           if (game.objects[i].y < 120) {
@@ -517,7 +533,7 @@ ktk.vio = (function() {
 
           // potential changes:
           //   position, velocity, facing, animation, set, frame, state(?), hp, destroy, create
-          //var dirty = game.objects[i].D;
+          //var dirty = game.objects[i].F;
           //dirty & 1 ? nsendall(4, [i, 0, game.objects[i].x, game.objects[i].y]) : '';
           //dirty & 2 ? nsendall(4, [i, 1, game.objects[i].v.x, game.objects[i].v.y]) : '';
           /*
@@ -595,21 +611,19 @@ ktk.vio = (function() {
       console.log('class ' + name + ' already exists, overwriting');
     }
     var evaluated = eval('('+code+')');
-    if (typeof evaluated.inherits !== 'undefined') {
-      if (typeof classes[evaluated.inherits] === 'undefined') {
-        console.log(name + ': Warning, inherited class ' + evaluated.inherits + ' does not exist!');
+    if (typeof evaluated._ !== 'undefined') {
+      if (typeof classes[evaluated._] === 'undefined') {
+        console.log(name + ': Warning, inherited class ' + evaluated._ + ' does not exist!');
         // ... load?
       } else {
-        evaluated = Object.assign({}, {D:0,x:0,y:0,v:{x:0,y:0},f:0,}, classes[evaluated.inherits], evaluated);
+        evaluated = Object.assign({}, classes[evaluated._], evaluated);
       }
-    } else {
-      evaluated = Object.assign({}, {D:0,x:0,y:0,v:{x:0,y:0},f:0,}, evaluated);
     }
     classes[name] = evaluated;
     console.log('...' + name);
   }
   /* ==== Objects ==== */
-  function createObject(name) {
+  function createObject(name, global) {
     var object = {};
     if (typeof classes[name] === 'undefined') {
       console.log('Error, class ' + name + ' does not exist!');
@@ -617,10 +631,10 @@ ktk.vio = (function() {
       object = Object.create(classes[name]);
     }
     // TODO: game object id
-    if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16);
-    if (object.onConception) object.onConception();
+    if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16, global);
+    if (object.onConception) object.onConception(object);
     game.objects.push(object);
-    if (object.onBirth) object.onBirth();
+    if (object.onBirth) object.onBirth(object);
 
     return object;
   }

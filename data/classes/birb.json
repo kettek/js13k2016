@@ -1,27 +1,28 @@
 {
+  _: 'entity',
   name: "Birb",
   sprite: "birb:birb:run",
-  onConception: function() {
+  sprites: [],
+  onConception: function(_) {
+    var t = createObject("text");
+    t.attach(this);
   },
-  onBirth: function() {
+  onBirth: function(_) {
   },
   is_walking: 0,
   speed: 2,
-  onThink: function() {
+  onThink: function(_) {
     if (keys[37]) {
-      this.v.x -= this.speed;
-      this.sprite.flip = true;
-      this.sprite.animate = true;
+      _.v.x -= _.speed;
+      _.sprite.flip = true;
+      _.sprite.animate = true;
     } else if (keys[39]) {
-      this.v.x += this.speed;
-      this.sprite.flip = false;
-      this.sprite.animate = true;
+      _.v.x += _.speed;
+      _.sprite.flip = false;
+      _.sprite.animate = true;
     }
-    if (Math.abs(this.v.x) <= 0.2) {
-      this.sprite.animate = false;
-    }
-    if (this.is_walking) {
-      this.v.x += this.f[0]*this.speed;
+    if (Math.abs(_.v.x) <= 0.2) {
+      _.sprite.animate = false;
     }
   }
 }
