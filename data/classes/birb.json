@@ -1,0 +1,15 @@
+{
+  name: "Birb",
+  sprite: "birb:birb:run",
+  onConception: function() {
+  },
+  onBirth: function() {
+  },
+  is_walking: 0,
+  speed: 0,
+  onThink: function() {
+    if (this.is_walking) {
+      this.v.x += this.f[0]*this.speed;
+    }
+  }
+}

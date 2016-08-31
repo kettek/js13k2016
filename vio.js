@@ -45,57 +45,44 @@ Game State Logic
   * NetStart
     * set up WebRTC stuff
     * start NetJoin to ourself
-  * NetService
-    *
   * NetJoin
     * connect to server
     * receive pertinent information:
       * Our Player ID
       * All Players
-      * All entities on the map
       * etc
     * On finish, switch to NetGame
   * NetGame
-    * Handle user keypresses/commands and send to server
-    * Locally predict our movement
-    * on receive of data, let server know the last packet ID received
-    *
-    * Start ticking entities and watevs?
+    * Begins on TravelState
+      * TravelState clears the game world, creates the map, and places entities in it
+      * on finish, GameState is switched to
+    * GameState
+      * if server
+        * handle received player commands
+        * tick the world
+        * send world delta for each player
+        * if "travel" is triggered, send Travel to all clients and switch to TravelState
+      * if client
+        * Handle user keypresses/commands and send to server
+        * if not server
+          * update entities with received server data
+          * Locally predict velocities of entities
+          * if "travel" is received, switch to TravelState
+
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Mid-game Netcode Flow
+````````````````````````````````
+[server]                         [client]
+handleNetData   <-------------- send {CMD} (MOVE dir, ACT id, LEAVE, CHAT, etc.)
+ check net->player id
+  handlePlayerInput(id, CMD)
+run world                       run world (simulate velocities)
+ send change deltas ----------->  update objects with deltas
+                                  ---- OR IF ALSO SERVER ----
+                                        do nothing
 ============================================================================= */ 
 
 var ktk = ktk || {};
-
-ktk.getCallerName = function() {
-  var name = ktk.getCallerName.caller.toString();
-  name = name.substr('function '.length);
-  name = name.substr(0, name.indexOf('('));
-  name = name + '> ';
-  return name;
-};
-
-Object.defineProperty(this, 'fn', {
-  get: ktk.getCallerName
-});
-
-var logr = (function() {
-  var depth = 0;
-  return function LOG() {
-    if (arguments.length > 0) {
-      var args = Array.prototype.slice.call(arguments);
-      var name = LOG.caller.toString();
-      name = name.substr('function '.length);
-      name = name.substr(0, name.indexOf('('));
-      args.unshift(name+'> ');
-      args.unshift(Array(depth).join(' '));
-      console.log.apply(console, args);
-    } 
-    return function(inc) {
-      depth += inc;
-      if (depth < 0) depth = 0;
-    }
-  }
-})();
-
 /*
 The render has built-in rendering optimizations! This is dictated by a "virtual size" that splits the map into sections and places sprites within those sections for rendering. The quadrant sizes are dictated by (canvas.width*2 x canvas.height*2).
 */
@@ -132,13 +119,6 @@ ktk.rndr = (function() {
       // add our offscreen canvas
       display.appendChild(o_canvas);
     }
-    function setSize(w, h) {
-      screen.w = w;
-      screen.h = h;
-      if (virtual.w < w || virtual.h < h) setupQuadrants();
-      canvas.width = w;
-      canvas.height = h;
-    }
     function handleDisplayResize() {
       var win = window.getComputedStyle(display, null);
       var d_w = parseInt(win.getPropertyValue('width'));
@@ -158,7 +138,6 @@ ktk.rndr = (function() {
       canvas.style.width = t_w+'px';
       canvas.style.height = t_h+'px';
       canvas.style.border = '1px solid red';
-      //setSize(t_w, t_h);
     }
     function onRender(delta) {
       context.clearRect(0, 0, canvas.width, canvas.height);
@@ -168,17 +147,17 @@ ktk.rndr = (function() {
         var sprite = quadrants[start.x][start.y].sprites[i];
         // TODO: probably have a "getImage" function that returns a dummy image if the file isn't loaded yet?
         if (images[sprite.image]) {
-          var frame = sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames[sprite.frame];
+          var frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
           // increase our frame if enough time has passed
           sprite.elapsed += delta;
           while (sprite.elapsed >= frame.t) {
             sprite.elapsed -= frame.t;
-            if (sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames.length-1 <= sprite.frame) {
+            if (sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F.length-1 <= sprite.frame) {
               sprite.frame = 0;
             } else {
               sprite.frame++;
             }
-            frame = sprite_data[sprite.image].Animations[sprite.anim].Sets[sprite.set].Frames[sprite.frame];
+            frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
           }
           // FIXME: the entire sprite flipping code is bad
           // draw it
@@ -317,7 +296,6 @@ ktk.rndr = (function() {
       handleDisplayResize();
       return this;
     },
-    setSize: setSize,
     getSize: function() {
       return {w: canvas.width, h: canvas.height};
     },
@@ -335,21 +313,22 @@ ktk.rndr = (function() {
       return new Promise(function(resolve, reject) {
         ktk.Filer.load('data/sprites/'+name+'.json').then(function(data) {
           // THIS IS REALLY NASTY (basically we're setting frames to inherit properties from set>animation>conf -- perhaps if we did something like "Object.assign(..frame.., (frame[...]->...), set.Conf, anim.conf, global.conf)"
-          var sprite_datum = JSON.parse(data);
-          sprite_datum.Img = sprite_datum.Img || {};
-          sprite_datum.Conf = sprite_datum.Conf || {};
-          for (var anim_name in sprite_datum["Animations"]) {
-            var anim = sprite_datum["Animations"][anim_name];
-            anim.Conf = anim.Conf || {};
-            for (var set_name in anim["Sets"]) {
-              var set = anim["Sets"][set_name];
-              set.Conf = set.Conf || {};
-              for (var frame_idx in set["Frames"]) {
-                var frame = set["Frames"][frame_idx];
+          // using eval to skip extra chars required by JSON.parse
+          var sprite_datum = eval('('+data+')');
+          sprite_datum.I = sprite_datum.I || name;
+          sprite_datum.C = sprite_datum.C || {};
+          for (var anim_name in sprite_datum.A) {
+            var anim = sprite_datum.A[anim_name];
+            anim.C = anim.C || {};
+            for (var set_name in anim.S) {
+              var set = anim.S[set_name];
+              set.C = set.C || {};
+              for (var frame_idx in set.F) {
+                var frame = set.F[frame_idx];
                 var frame_obj = { x: frame[0] || 0, y: frame[1] || 0, w: frame[2] || 16, h: frame[3] || 16, t: frame[4] || 100 };
-                Object.assign(frame_obj, sprite_datum.Conf, anim.Conf, set.Conf, frame_obj);
+                Object.assign(frame_obj, sprite_datum.C, anim.C, set.C, frame_obj);
                 // replace old array with actual frame object
-                set["Frames"][frame_idx] = frame_obj;
+                set.F[frame_idx] = frame_obj;
               }
             }
           }
@@ -370,7 +349,7 @@ ktk.rndr = (function() {
               o_context.restore();
               f_images[name].src = o_canvas.toDataURL();
             };
-            f_images[name].src = 'data/sprites/'+sprite_data[name].Img+'.png';
+            f_images[name].src = 'data/sprites/'+sprite_data[name].I+'.png';
             images[name].src = f_images[name].src;
           }
           resolve("loaded");
@@ -418,6 +397,8 @@ ktk.Filer = (function() {
 })();
 
 ktk.vio = (function() {
+  /* ** logic ** */
+  var is_server = false;
   /* ** display ** */
   var display = null;
   var renderer = null;
@@ -435,11 +416,13 @@ ktk.vio = (function() {
   //
   var state = null;
   /* ** file loading ? ** */
+  var classes = [];
   classes_pending = [];
 
   var game = {
-    classes: [],
-    objects: []
+    players: [], // id: {name, stats, object}
+    objects: [],
+    map: {}
   };
   /* ==== Game stuff ==== */
   function addForce(object, x, y) {
@@ -452,17 +435,42 @@ ktk.vio = (function() {
     }
   };
   var LobbyState = {
+    // herein lies joining a lobby and creating TravelState
   };
   var TravelState = {
+    // herein lies connecting to a given server and resetting world objects
   };
   var GameState = {
+    // herein lies the game physics state, calls TravelState on map change
+    onTick: function(elapsed) {
+      if (is_server) {
+        for (var i in game.objects) {
+          game.objects[i].onThink();
+          /*
+          if object's velocity, position, animation, frame, or otherwise has changed
+            iterate over each player and calculate the delta of the player's last packet data with the above changes in mind. These calculations are then added as Messages to the message queue?
+          */
+        }
+        for (var i in game.players) {
+          if (i != game.this_player) {
+            // ???
+          }
+        }
+      } else {
+        /*
+        check for pending game packets and update our objects in accordance with them
+        */
+        for (var i in game.objects) {
+          // run projected velocity
+        }
+      }
+    }
   };
   var TestState = {
     local_objects: [],
     onInit: function() {
       renderer.setVirtualSize(1920, 1080);
-
-      this.local_objects.push(createObject("player"));
+      createObject("birb");
     },
     onTick: function(elapsed) {
       for (var i in game.objects) {
@@ -489,9 +497,9 @@ ktk.vio = (function() {
     }, function(error) {
       reject("Could not load class '" + name + "': " + error);
     }).then(function() {
-      if (typeof game.classes[name].sprite !== 'undefined') {
-        console.log('Loading sprite "' +game.classes[name].sprite+ '"...');
-        renderer.loadSpriteData(game.classes[name].sprite).then(function(ok) {
+      if (typeof classes[name].sprite !== 'undefined') {
+        console.log('Loading sprite "' +classes[name].sprite+ '"...');
+        renderer.loadSpriteData(classes[name].sprite).then(function(ok) {
           console.log(ok);
         }, function(err) {
           console.log(err);
@@ -502,29 +510,29 @@ ktk.vio = (function() {
     });
   }
   function loadClass(name, code) {
-    if (typeof game.classes[name] !== 'undefined') {
+    if (typeof classes[name] !== 'undefined') {
       console.log('class ' + name + ' already exists, overwriting');
     }
     var evaluated = eval('('+code+')');
     if (typeof evaluated.inherits !== 'undefined') {
-      if (typeof game.classes[evaluated.inherits] === 'undefined') {
+      if (typeof classes[evaluated.inherits] === 'undefined') {
         console.log(name + ': Warning, inherited class ' + evaluated.inherits + ' does not exist!');
         // ... load?
       } else {
-        evaluated = Object.assign({}, {v:{x:0,y:0},f:0,}, game.classes[evaluated.inherits], evaluated);
+        evaluated = Object.assign({}, {v:{x:0,y:0},f:0,}, classes[evaluated.inherits], evaluated);
       }
     } else {
     }
-    game.classes[name] = evaluated;
+    classes[name] = evaluated;
     console.log('...' + name);
   }
   /* ==== Objects ==== */
   function createObject(name) {
     var object = {};
-    if (typeof game.classes[name] === 'undefined') {
+    if (typeof classes[name] === 'undefined') {
       console.log('Error, class ' + name + ' does not exist!');
     } else {
-      object = Object.create(game.classes[name]);
+      object = Object.create(classes[name]);
     }
     // TODO: game object id
     if (object.sprite) object.sprite = renderer.createSprite(object.sprite, 16, 16);
