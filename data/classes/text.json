@@ -11,12 +11,9 @@
     var t = text.split('');
     for (var i in this.sprite.children) this.sprite.children[i].detach();
     for (var i in t) {
-      console.log(i);
       if (i == 0) {
         this.sprite.frame = (t[i].charCodeAt(0)-32);
-        console.log('setting to ' + t[i]);
       } else {
-        console.log('creating ' + t[i]);
         var s = createSprite("fonts:small:0:"+(t[i].charCodeAt(0)-32), i*8, 0);
         s.animate = 0;
         s.attach(this.sprite);

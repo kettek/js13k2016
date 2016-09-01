@@ -239,7 +239,6 @@ ktk.vio = (function() {
     sprite.quadrant.y = y;
     sprite.quadrant.index = quadrants[x][y].sprites.length;
     quadrants[x][y].sprites.push(sprite);
-    console.log('added sprite to ' + x + 'x' + y);
   };
   function removeSpriteFromQuadrant(sprite) {
     quadrants[sprite.quadrant.x][sprite.quadrant.y].sprites.splice(sprite.quadrant.index, 1);
@@ -348,22 +347,33 @@ ktk.vio = (function() {
         reject(error);
       }).then(function() {
         if (typeof images[name] === 'undefined') {
-          // FIXME: this is pretty ugly -- we should probably load the data via Filer instead of using src directly
-          f_images[name] = new Image();
-          images[name] = new Image();
-          images[name].onload = function(e) {
-            o_canvas.width = images[name].width;
-            o_canvas.height = images[name].height;
-            o_context.save();
-            o_context.scale(-1,1);
-            o_context.drawImage(images[name], -images[name].width, 0);
-            o_context.restore();
-            f_images[name].src = o_canvas.toDataURL();
-          };
-          f_images[name].src = 'data/sprites/'+sprite_data[name].I+'.png';
-          images[name].src = f_images[name].src;
+          console.log('loading image "' + name + '"...');
+          return new Promise(function(resolve, reject) {
+            f_images[name] = new Image();
+            images[name] = new Image();
+            images[name].onload = function(e) {
+              o_canvas.width = images[name].width;
+              o_canvas.height = images[name].height;
+              o_context.save();
+              o_context.scale(-1,1);
+              o_context.drawImage(images[name], -images[name].width, 0);
+              o_context.restore();
+              f_images[name].src = o_canvas.toDataURL();
+              resolve();
+            };
+            images[name].onerror = function(e) {
+              reject();
+            };
+            f_images[name].src = 'data/sprites/'+sprite_data[name].I+'.png';
+            images[name].src = f_images[name].src;
+          });
         }
-        resolve("loaded");
+        resolve();
+      }).then(function() {
+        console.log('...done!');
+        resolve();
+      }, function(error) {
+        reject(error);
       });
     });
   }
@@ -430,11 +440,6 @@ ktk.vio = (function() {
     objects: [],
     map: {}
   };
-  /* ==== Game stuff ==== */
-  function addForce(object, x, y) {
-    object.vel.x += x;
-    object.vel.y += y;
-  }
   /* ==== Networking ==== */
   var handleMessage = function(e) {
     if (is_server) {
@@ -459,7 +464,7 @@ ktk.vio = (function() {
   /* ==== Class load/create ==== */
   function loadClasses(names) {
     return new Promise(function(resolve, reject) {
-      console.log("Loading classes...");
+      console.log("> Loading classes...");
       classes_pending = classes_pending.concat(names);
       loadPendingClass(resolve, reject);
     });
@@ -474,16 +479,15 @@ ktk.vio = (function() {
       loadClass(name, data);
     }, function(error) {
       reject("Could not load class '" + name + "': " + error);
-    }).then(function() {
+    }).then(function() { // load our sprite graphic
       if (typeof classes[name].sprite !== 'undefined') {
-        console.log('Loading sprite "' +classes[name].sprite+ '"...');
-        loadSpriteData(classes[name].sprite).then(function(ok) {
-          console.log(ok);
-        }, function(err) {
-          console.log(err);
-        });
+        return loadSpriteData(classes[name].sprite);
       }
     }).then(function() {
+      console.log('...ok!');
+    }, function(error) {
+      console.log(error);
+    }).then(function() { // load next class
       loadPendingClass(resolve, reject);
     });
   }
@@ -501,7 +505,7 @@ ktk.vio = (function() {
       }
     }
     classes[name] = evaluated;
-    console.log('...' + name);
+    console.log(name + '...');
   }
   /* ==== Objects ==== */
   function createObject(name) {
@@ -601,16 +605,23 @@ ktk.vio = (function() {
           game.objects[i].sprite.y = game.objects[i].y;
           for (var j in game.objects[i].c) {
             var child = game.objects[i].c[j];
-            child.x += game.objects[i].v.x;
-            child.y += game.objects[i].v.y;
+            child.x = game.objects[i].x;
+            child.y = game.objects[i].y;
             child.sprite.x = child.x;
             child.sprite.y = child.y;
           }
           game.objects[i].v.x *= 0.5;
           game.objects[i].v.y *= 0.5;
-          if (game.objects[i].y < 120) {
-            game.objects[i].v.y += 0.5;
-            game.objects[i].v.y *= 1.5;
+          // apply gravity
+          if (game.objects[i].v.y < 0) {
+            game.objects[i].v.y *= 0.9;
+          }
+          if (game.objects[i].y < 160) {
+            game.objects[i].v.y += 2;
+          }
+          if (game.objects[i].y >= 160-(game.objects[i].h||16)) {
+            game.objects[i].y = 160-(game.objects[i].h||16);
+            game.objects[i].v.y = 0;
           }
 
           // potential changes:
@@ -646,18 +657,19 @@ ktk.vio = (function() {
     }
   };
   function onInit() {
-    // get display
-    initDisplay(document.getElementById('display'));
-    handleDisplayResize();
-    // set up keyboard hooks
-    window.addEventListener('keydown', function(e) { keys[e.which] = true; }, false);
-    window.addEventListener('keyup', function(e) { keys[e.which] = false; }, false);
-    // start rendering
-    is_rendering = true;
-    frame_last = new Date();
-    onRenderLoop();
     // load our game data
     loadGameData().then(function() {
+      console.log('> Everything A-OK, let\'s go!');
+      // get display
+      initDisplay(document.getElementById('display'));
+      handleDisplayResize();
+      // set up keyboard hooks
+      window.addEventListener('keydown', function(e) { keys[e.which] = true; }, false);
+      window.addEventListener('keyup', function(e) { keys[e.which] = false; }, false);
+      // start rendering
+      is_rendering = true;
+      frame_last = new Date();
+      onRenderLoop();
       // start our logic loop
       is_running = true;
       tick_last = new Date();

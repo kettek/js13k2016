@@ -11,6 +11,7 @@
   },
   is_walking: 0,
   speed: 2,
+  falling: 0,
   onThink: function(_) {
     if (keys[37]) {
       _.v.x -= _.speed;
@@ -21,8 +22,16 @@
       _.sprite.flip = false;
       _.sprite.animate = true;
     }
+    if (keys[38] && !_.falling) {
+      _.v.y -= _.speed*4;
+    }
     if (Math.abs(_.v.x) <= 0.2) {
       _.sprite.animate = false;
+    }
+    if (Math.abs(_.v.y) != 0) {
+      _.falling = 1;
+    } else {
+      _.falling = 0;
     }
   }
 }
