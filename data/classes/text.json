@@ -17,7 +17,7 @@
         console.log('setting to ' + t[i]);
       } else {
         console.log('creating ' + t[i]);
-        var s = renderer.createSprite("fonts:small:0:"+(t[i].charCodeAt(0)-32), i*8, 0);
+        var s = createSprite("fonts:small:0:"+(t[i].charCodeAt(0)-32), i*8, 0);
         s.animate = 0;
         s.attach(this.sprite);
       }
