@@ -163,7 +163,7 @@ ktk.vio = (function() {
     y = y || 0;
     if (images[sprite.image]) {
       var frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
-      if (sprite.animate) {
+      if (frame.t > 0 && sprite.animate) {
         // increase our frame if enough time has passed
         sprite.elapsed += delta;
         while (sprite.elapsed >= frame.t) {
@@ -265,11 +265,18 @@ ktk.vio = (function() {
     this.sprites = [];
   };
   function setupSprite(sprite) {
-    var inter = getQuadrantIntersection(sprite.x, sprite.y);
-    addSpriteToQuadrant(sprite, inter.x, inter.y);
+    if (sprite.type == 0) {
+      console.log(' quadrants');
+      var inter = getQuadrantIntersection(sprite.x, sprite.y);
+      addSpriteToQuadrant(sprite, inter.x, inter.y);
+    } else if (sprite.type == 1) {
+      console.log(' global');
+      sprite.id = getSpriteId();
+      sprites.push(sprite);
+    }
   };
   /* ==== Sprite ==== */
-  function Sprite(image, x, y) {
+  function Sprite(image, x, y, type) {
     this.parent = null;
     this.children = [];
     this.id = 0;
@@ -282,6 +289,7 @@ ktk.vio = (function() {
     this.elapsed = 0;
     this.flip = false;
     this.animate = sprite_data[image].C.a;
+    this.type = type; // 0 = quadrants, 1 = global, 2 = attach/detach
     this.quadrant = {
       x: 0,
       y: 0,
@@ -295,11 +303,11 @@ ktk.vio = (function() {
       this.parent = null;
     };
     this.attach = function(parent) {
-      if (this.id != 0) {
+      if (this.type == 0) {
+        removeSpriteFromQuadrant(this);
+      } else if (this.type == 1) {
         sprite_ids.push(this.id);
         sprites.splice(this.id, 1);
-      } else if (this.quadrant.index != -1) {
-        removeSpriteFromQuadrant(this);
       }
       this.detach();
       this.parent = parent;
@@ -402,18 +410,14 @@ ktk.vio = (function() {
     }
     return id;
   }
-  function createSprite(name, x, y, global) {
+  function createSprite(name, x, y, type) {
     var parts = name.split(":");
     var sprite = new Sprite(parts[0], x, y);
     sprite.anim = parts[1] ? parts[1] : '';
     sprite.set = parts[2] ? parts[2] : '';
     sprite.frame = parts[3] ? parseInt(parts[3]) : 0;
-    if (global) {
-      sprite.id = this.getSpriteId();
-      sprites.push(sprite);
-    } else {
-      setupSprite(sprite);
-    }
+    sprite.type = type;
+    setupSprite(sprite);
     return sprite;
   }
   function deleteSprite(sprite) {
@@ -529,7 +533,7 @@ ktk.vio = (function() {
       object = Object.create(classes[name]);
     }
     // TODO: game object id
-    if (object.sprite) object.sprite = createSprite(object.sprite, 16, 16);
+    if (object.sprite) object.sprite = createSprite(object.sprite, 16, 16, 0);
     var args = Array.prototype.slice.call(arguments, 1);
     args.unshift(object);
     if (object.onConception) object.onConception.apply(object, args);

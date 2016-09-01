@@ -1,23 +1,31 @@
 {
   _: 'entity',
   sprite: "fonts:small:0",
+  ss: [],
   P: 0,
   n: "",
   onConception: function(_, text) {
-    _.sprite.animate = 0;
+    _.ss.push(_.sprite);
     _.set(text);
   },
   set: function(text) {
+    var _ = this;
     var t = text.split('');
-    for (var i in this.sprite.children) this.sprite.children[i].detach();
-    for (var i in t) {
-      if (i == 0) {
-        this.sprite.set = (t[i].charCodeAt(0)-32);
+    console.log(t.length + ' vs ' + (_.ss.length));
+    var i = 0;
+    for (i in t) {
+      if (_.ss[i]) {
+        _.ss[i].set = (t[i].charCodeAt(0)-32);
+        _.ss[i].x = i*5;
       } else {
-        var s = createSprite("fonts:small:"+(t[i].charCodeAt(0)-32), i*8, 0);
-        s.animate = 0;
-        s.attach(this.sprite);
+        var s = createSprite("fonts:small:"+(t[i].charCodeAt(0)-32), i*5, 0, 2);
+        _.ss.push(s);
+        s.attach(_.ss[0]);
       }
+    }
+    for (i = i; i < _.ss.length-1; i++) {
+      _.ss[i].detach(_.sprite);
+      _.ss.splice(i, 1);
     }
   }
 }
