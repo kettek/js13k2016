@@ -330,15 +330,28 @@ ktk.vio = (function() {
         for (var anim_name in sprite_datum.A) {
           var anim = sprite_datum.A[anim_name];
           anim.C = anim.C || {};
-          for (var set_name in anim.S) {
-            var set = anim.S[set_name];
-            set.C = set.C || {};
-            for (var frame_idx in set.F) {
-              var frame = set.F[frame_idx];
-              var frame_obj = { x: frame[0] || 0, y: frame[1] || 0, w: frame[2] || 16, h: frame[3] || 16, t: frame[4] || 100 };
-              Object.assign(frame_obj, sprite_datum.C, anim.C, set.C, frame_obj);
-              // replace old array with actual frame object
-              set.F[frame_idx] = frame_obj;
+          Object.assign(anim.C, sprite_datum.C, anim.C);
+          if (anim.C.T == 1) { // tile w/ rows + cols
+            anim.S = anim.S || {};
+            for (var y = 0; y < anim.C.r; y++) {
+              for (var x = 0; x < anim.C.c; x++) {
+                anim.S[y*anim.C.c+x] = {
+                  'F': [{ x: anim.C.w*x, y: anim.C.h*y, w: anim.C.w, h: anim.C.h, t: 0 }]
+                };
+              }
+            }
+          } else {
+            for (var set_name in anim.S) {
+              var set = anim.S[set_name];
+              set.C = set.C || {};
+              Object.assign(set.C, anim.C, set.C);
+              for (var frame_idx in set.F) {
+                var frame = set.F[frame_idx];
+                var frame_obj = { x: frame[0] || 0, y: frame[1] || 0, w: frame[2] || 16, h: frame[3] || 16, t: frame[4] || 100 };
+                Object.assign(frame_obj, sprite_datum.C, anim.C, set.C, frame_obj);
+                // replace old array with actual frame object
+                set.F[frame_idx] = frame_obj;
+              }
             }
           }
         }
