@@ -3,8 +3,10 @@
   sprite: "fonts:small:0",
   ss: [],
   P: 0,
+  text: "",
   n: "",
   onConception: function(_, text) {
+    _.text = text;
     _.ss.push(_.sprite);
     _.set(text);
   },

@@ -422,8 +422,9 @@ ktk.vio = (function() {
   }
   function deleteSprite(sprite) {
     if (sprite.id != 0) {
-      sprite_ids.push(sprite_id);
-      sprites.splice(sprite.id, 1);
+      sprite_ids.push(sprite.id);
+      //sprites.splice(sprite.id, 1);
+      sprites.splice(sprites.indexOf(sprite), 1);
     } else {
       removeSpriteFromQuadrant(sprite);
     }
@@ -542,6 +543,10 @@ ktk.vio = (function() {
 
     return object;
   }
+  function destroyObject(object) {
+    object.sprite?deleteSprite(object.sprite):0;
+    game.objects.splice(game.objects.indexOf(object), 1);
+  }
   /* ==== Game Logic ==== */
   function loadGameData() {
     return new Promise(function(resolve, reject) {
@@ -595,7 +600,24 @@ ktk.vio = (function() {
   }
   /* ==== State ==== */
   var MenuState = {
+    menus: [],
+    onInit: function() {
+      setVirtualSize(1920, 1080);
+      this.menus[0]=createObject('text','Start Game');
+      this.menus[0].sprite.y += 10;
+      this.menus[1]=createObject('text', 'Join Game');
+      this.menus[1].sprite.y += 100;
+    },
     onTick: function(elapsed) {
+      if (keys[13]) {
+        changeState(GameState);
+      }
+    },
+    onClose: function() {
+      for (i in this.menus) {
+        destroyObject(this.menus[i]);
+      }
+      this.menus = [];
     }
   };
   var LobbyState = {
@@ -609,6 +631,8 @@ ktk.vio = (function() {
     onInit: function() {
       setVirtualSize(1920, 1080);
       createObject("birb");
+    },
+    onClose: function() {
     },
     onTick: function(elapsed) {
       if (is_server) {
@@ -659,11 +683,11 @@ ktk.vio = (function() {
       }
       // client
       {
-        keys[37] ? nsend(3,0): ''; // left
-        keys[39] ? nsend(3,1): ''; // right
-        keys[38] ? nsend(3,2): ''; // up
-        keys[40] ? nsend(3,3): ''; // down
-        keys[90] ? nsend(3,4): ''; // z
+        keys[37] ? nsend(3,0):0; // left
+        keys[39] ? nsend(3,1):0; // right
+        keys[38] ? nsend(3,2):0; // up
+        keys[40] ? nsend(3,3):0; // down
+        keys[90] ? nsend(3,4):0; // z
         /*
         check for pending game packets and update our objects in accordance with them
         */
@@ -690,10 +714,14 @@ ktk.vio = (function() {
       // start our logic loop
       is_running = true;
       tick_last = new Date();
-      state = GameState;
-      state.onInit();
+      changeState(MenuState);
       onLoop();
     });
+  }
+  function changeState(state_) {
+    if (state) state.onClose();
+    state = state_;
+    state.onInit();
   }
 
   return {
