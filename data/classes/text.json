@@ -1,22 +1,21 @@
 {
   _: 'entity',
-  sprite: "fonts:small:0",
+  S: "fonts:small:0",
   ss: [],
   P: 0,
-  text: "",
   n: "",
-  onConception: function(_, text) {
-    _.text = text;
-    _.ss.push(_.sprite);
-    _.set(text);
+  onConception: function(_, n) {
+    _.n = n;
+    _.ss.push(_.S);
+    _.set(n);
   },
-  set: function(text) {
+  set: function(n) {
     var _ = this;
-    var t = text.split('');
+    var t = n.split('');
     var i = 0;
     for (i in t) {
       if (_.ss[i]) {
-        _.ss[i].set = (t[i].charCodeAt(0)-32);
+        _.ss[i].S = (t[i].charCodeAt(0)-32);
         _.ss[i].x = i*5;
       } else {
         var s = createSprite("fonts:small:"+(t[i].charCodeAt(0)-32), i*5, 0, 2);

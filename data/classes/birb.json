@@ -1,11 +1,11 @@
 {
   _: 'entity',
-  name: "Birb",
-  sprite: "birb:birb:run",
+  n: "brib",
+  S: "birb:birb:run",
   sprites: [],
   title: null,
   onConception: function(_) {
-    title = createObject("text", "hlo, i r brib");
+    title = createObject("text", "hlo, i r "+_.n);
     title.attach(this);
   },
   onBirth: function(_) {
@@ -16,18 +16,18 @@
   onThink: function(_) {
     if (keys[37]) {
       _.v.x -= _.speed;
-      _.sprite.flip = true;
-      _.sprite.animate = 1;
+      _.S.f = 1;
+      _.S.a = 1;
     } else if (keys[39]) {
       _.v.x += _.speed;
-      _.sprite.flip = false;
-      _.sprite.animate = 1;
+      _.S.f = 0;
+      _.S.a = 1;
     }
     if (keys[38] && !_.falling) {
       _.v.y -= _.speed*4;
     }
     if (Math.abs(_.v.x) <= 0.2) {
-      _.sprite.animate = 0;
+      _.S.a = 0;
     }
     if (Math.abs(_.v.y) != 0) {
       _.falling = 1;

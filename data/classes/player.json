@@ -1,7 +1,7 @@
 {
   _: 'entity',
-  name: "Player",
-  sprite: "player:player:walk",
+  n: "Player",
+  S: "player:player:walk",
   // my, what an interesting name!
   onConception: function() {
     /*this.head = game.createSprite("player:head");
@@ -17,7 +17,7 @@
   is_walking: 0,
   speed: 0,
   faceDirection: function(dir) {
-    this.sprite.flip = 1;
+    this.S.flip = 1;
   },
   onThink: function() {
     if (this.is_walking) {

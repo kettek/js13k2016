@@ -180,31 +180,31 @@ ktk.vio = (function() {
   function drawSprite(sprite, delta, x, y) {
     x = x || 0;
     y = y || 0;
-    if (images[sprite.image]) {
-      var frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
-      if (frame.t > 0 && sprite.animate) {
+    if (images[sprite.I]) {
+      var frame = sprite_data[sprite.I].A[sprite.A].S[sprite.S].F[sprite.F];
+      if (frame.t > 0 && sprite.a) {
         // increase our frame if enough time has passed
-        sprite.elapsed += delta;
-        while (sprite.elapsed >= frame.t) {
-          sprite.elapsed -= frame.t;
-          if (sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F.length-1 <= sprite.frame) {
-            sprite.frame = 0;
+        sprite.e += delta;
+        while (sprite.e >= frame.t) {
+          sprite.e -= frame.t;
+          if (sprite_data[sprite.I].A[sprite.A].S[sprite.S].F.length-1 <= sprite.F) {
+            sprite.F = 0;
           } else {
-            sprite.frame++;
+            sprite.F++;
           }
-          frame = sprite_data[sprite.image].A[sprite.anim].S[sprite.set].F[sprite.frame];
+          frame = sprite_data[sprite.I].A[sprite.A].S[sprite.S].F[sprite.F];
         }
       }
       // FIXME: the entire sprite flipping code is bad
       // draw it
-      if (sprite.flip) {
-        context.drawImage(f_images[sprite.image], (f_images[sprite.image].width-frame.w)-frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x+x), Math.floor(sprite.y+y), frame.w, frame.h);
+      if (sprite.f) {
+        context.drawImage(f_images[sprite.I], (f_images[sprite.I].width-frame.w)-frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x+x), Math.floor(sprite.y+y), frame.w, frame.h);
       } else {
-        context.drawImage(images[sprite.image], frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x+x), Math.floor(sprite.y+y), frame.w, frame.h);
+        context.drawImage(images[sprite.I], frame.x, frame.y, frame.w, frame.h, Math.floor(sprite.x+x), Math.floor(sprite.y+y), frame.w, frame.h);
       }
     }
-    for (var i in sprite.children) {
-      drawSprite(sprite.children[i], delta, sprite.x, sprite.y);
+    for (var i in sprite.c) {
+      drawSprite(sprite.c[i], delta, sprite.x, sprite.y);
     }
   }
   function onRender(delta) {
@@ -284,31 +284,29 @@ ktk.vio = (function() {
     this.sprites = [];
   };
   function setupSprite(sprite) {
-    if (sprite.type == 0) {
-      console.log(' quadrants');
+    if (sprite.t == 0) {
       var inter = getQuadrantIntersection(sprite.x, sprite.y);
       addSpriteToQuadrant(sprite, inter.x, inter.y);
-    } else if (sprite.type == 1) {
-      console.log(' global');
+    } else if (sprite.t == 1) {
       sprite.id = getSpriteId();
       sprites.push(sprite);
     }
   };
   /* ==== Sprite ==== */
   function Sprite(image, x, y, type) {
-    this.parent = null;
-    this.children = [];
+    this.p = null;
+    this.c = [];
     this.id = 0;
     this.x = x;
     this.y = y;
-    this.image = image;
-    this.anim = '';
-    this.set = '';
-    this.frame = 0;
-    this.elapsed = 0;
-    this.flip = false;
-    this.animate = sprite_data[image].C.a;
-    this.type = type; // 0 = quadrants, 1 = global, 2 = attach/detach
+    this.I = image;
+    this.A = '';
+    this.S = '';
+    this.F = 0;
+    this.e = 0;
+    this.f = false;
+    this.a = sprite_data[image].C.a;
+    this.t = type; // 0 = quadrants, 1 = global, 2 = attach/detach
     this.quadrant = {
       x: 0,
       y: 0,
@@ -316,10 +314,10 @@ ktk.vio = (function() {
     };
     //
     this.detach = function() {
-      if (!this.parent) return;
-      var i = this.parent.children.indexOf(this);
-      if (i != 1) this.parent.children.splice(i, 1);
-      this.parent = null;
+      if (!this.p) return;
+      var i = this.p.c.indexOf(this);
+      if (i != 1) this.p.c.splice(i, 1);
+      this.p = null;
     };
     this.attach = function(parent) {
       if (this.type == 0) {
@@ -329,8 +327,8 @@ ktk.vio = (function() {
         sprites.splice(this.id, 1);
       }
       this.detach();
-      this.parent = parent;
-      this.parent.children.push(this);
+      this.p = parent;
+      this.p.c.push(this);
     };
   };
   function getSize() {
@@ -432,10 +430,10 @@ ktk.vio = (function() {
   function createSprite(name, x, y, type) {
     var parts = name.split(":");
     var sprite = new Sprite(parts[0], x, y);
-    sprite.anim = parts[1] ? parts[1] : '';
-    sprite.set = parts[2] ? parts[2] : '';
-    sprite.frame = parts[3] ? parseInt(parts[3]) : 0;
-    sprite.type = type;
+    sprite.A = parts[1] ? parts[1] : '';
+    sprite.S = parts[2] ? parts[2] : '';
+    sprite.F = parts[3] ? parseInt(parts[3]) : 0;
+    sprite.t = type;
     setupSprite(sprite);
     return sprite;
   }
@@ -447,8 +445,8 @@ ktk.vio = (function() {
     } else {
       removeSpriteFromQuadrant(sprite);
     }
-    for (i in sprite.children) {
-      deleteSprite(sprite.children[i]);
+    for (i in sprite.c) {
+      deleteSprite(sprite.c[i]);
     }
   }
 /*,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
@@ -520,8 +518,8 @@ ktk.vio = (function() {
     }, function(error) {
       reject("Could not load class '" + name + "': " + error);
     }).then(function() { // load our sprite graphic
-      if (typeof classes[name].sprite !== 'undefined') {
-        return loadSpriteData(classes[name].sprite);
+      if (typeof classes[name].S !== 'undefined') {
+        return loadSpriteData(classes[name].S);
       }
     }).then(function() {
       console.log('...ok!');
@@ -556,7 +554,7 @@ ktk.vio = (function() {
       object = cloneObject(classes[name]);
     }
     // TODO: game object id
-    if (object.sprite) object.sprite = createSprite(object.sprite, 16, 16, 0);
+    if (object.S) object.S = createSprite(object.S, 16, 16, 0);
     var args = Array.prototype.slice.call(arguments, 1);
     args.unshift(object);
     if (object.onConception) object.onConception.apply(object, args);
@@ -566,7 +564,7 @@ ktk.vio = (function() {
     return object;
   }
   function destroyObject(object) {
-    object.sprite?deleteSprite(object.sprite):0;
+    object.S?deleteSprite(object.S):0;
     game.objects.splice(game.objects.indexOf(object), 1);
     for (i in object.c) {
       destroyObject(object.c[i]);
@@ -629,9 +627,9 @@ ktk.vio = (function() {
     onInit: function() {
       setVirtualSize(1920, 1080);
       this.menus[0]=createObject('text','Start Game');
-      this.menus[0].sprite.y += 10;
+      this.menus[0].S.y += 10;
       this.menus[1]=createObject('text', 'Join Game');
-      this.menus[1].sprite.y += 100;
+      this.menus[1].S.y += 100;
     },
     onTick: function(elapsed) {
       if (keys[13]) {
@@ -667,14 +665,14 @@ ktk.vio = (function() {
           // run physics
           game.objects[i].x += game.objects[i].v.x;
           game.objects[i].y += game.objects[i].v.y;
-          game.objects[i].sprite.x = game.objects[i].x;
-          game.objects[i].sprite.y = game.objects[i].y;
+          game.objects[i].S.x = game.objects[i].x;
+          game.objects[i].S.y = game.objects[i].y;
           for (var j in game.objects[i].c) {
             var child = game.objects[i].c[j];
             child.x = game.objects[i].x;
             child.y = game.objects[i].y;
-            child.sprite.x = child.x;
-            child.sprite.y = child.y;
+            child.S.x = child.x;
+            child.S.y = child.y;
           }
           game.objects[i].v.x *= 0.5;
           game.objects[i].v.y *= 0.5;
