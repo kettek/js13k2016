@@ -1,24 +1,27 @@
 {
   _: 'entity',
-  S: "fonts:small:0",
+  S: "fonts:0:0",
   ss: [],
   P: 0,
   n: "",
-  onConception: function(_, n) {
-    _.n = n;
+  onConception: function(_, n, t) {
+    _.S.A = t || 0;
+    _.n = n || '';
     _.ss.push(_.S);
-    _.set(n);
+    _.set(_.n);
   },
   set: function(n) {
     var _ = this;
     var t = n.split('');
     var i = 0;
+    var w = sprite_data[_.S.I].A[_.S.A].C.w;
     for (i in t) {
       if (_.ss[i]) {
+        _.ss[i].A = _.S.A;
         _.ss[i].S = (t[i].charCodeAt(0)-32);
-        _.ss[i].x = i*5;
+        _.ss[i].x = (!i==0?_.ss[i].x:i*w);
       } else {
-        var s = createSprite("fonts:small:"+(t[i].charCodeAt(0)-32), i*5, 0, 2);
+        var s = createSprite("fonts:"+_.S.A+":"+(t[i].charCodeAt(0)-32), i*w, 0, 2);
         _.ss.push(s);
         s.attach(_.ss[0]);
       }
@@ -27,5 +30,11 @@
       _.ss[i].detach(_.sprite);
       _.ss.splice(i, 1);
     }
+  },
+  width: function() {
+    _=this;
+    var w = sprite_data[_.S.I].A[_.S.A].C.w;
+    console.log(_.S);
+    return w * _.n.length;
   }
 }

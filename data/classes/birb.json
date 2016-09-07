@@ -5,7 +5,7 @@
   sprites: [],
   title: null,
   onConception: function(_) {
-    title = createObject("text", "hlo, i r "+_.n);
+    title = createObject("text", "hlo, i r "+_.n, 1);
     title.attach(this);
   },
   onBirth: function(_) {

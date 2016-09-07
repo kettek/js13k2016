@@ -361,7 +361,7 @@ ktk.vio = (function() {
             for (var y = 0; y < anim.C.r; y++) {
               for (var x = 0; x < anim.C.c; x++) {
                 anim.S[y*anim.C.c+x] = {
-                  'F': [{ x: anim.C.w*x, y: anim.C.h*y, w: anim.C.w, h: anim.C.h, t: 0 }]
+                  'F': [{ x: (anim.C.x||0)+anim.C.w*x, y: (anim.C.y||0)+anim.C.h*y, w: anim.C.w, h: anim.C.h, t: 0 }]
                 };
               }
             }
@@ -626,14 +626,25 @@ ktk.vio = (function() {
     menus: [],
     onInit: function() {
       setVirtualSize(1920, 1080);
-      this.menus[0]=createObject('text','Start Game');
-      this.menus[0].S.y += 10;
-      this.menus[1]=createObject('text', 'Join Game');
-      this.menus[1].S.y += 100;
+      this.menus[0]=createObject('text');
+      this.menus[0].S.y = 10;
+      this.menus[0].S.x = 13*8;
+      console.log(this.menus[0]);
+      this.menus[1]=createObject('text');
+      this.menus[1].S.y = 32;
+      this.menus[1].S.x = 13*8;
     },
+    i: 0,
     onTick: function(elapsed) {
       if (keys[13]) {
-        changeState(GameState);
+        this.i == 0 ? changeState(GameState) : changeState(LobbyState);
+      } else if (keys[38]) {
+        this.i = 0;
+      } else if (keys[40]) {
+        this.i = 1;
+      }
+      for (i in this.menus) {
+        this.menus[i].set((this.i==i?'> ':'  ')+(i==1?'Join':'Start')+' Game');
       }
     },
     onClose: function() {
@@ -645,6 +656,12 @@ ktk.vio = (function() {
   };
   var LobbyState = {
     // herein lies joining a lobby and creating TravelState
+    onInit: function() {
+    },
+    onClose: function() {
+    },
+    onTick: function(d) {
+    }
   };
   var TravelState = {
     // herein lies connecting to a given server and resetting world objects
