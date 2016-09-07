@@ -1,27 +1,25 @@
-{
-  _: 'entity',
-  n: "Player",
-  S: "player:player:walk",
-  // my, what an interesting name!
-  onConception: function() {
-    /*this.head = game.createSprite("player:head");
-    this.torso = game.createSprite("player:torso");
-    this.legs = game.createSprite("player:legs");*/
-    // attach head to torso
-    //this.head.attach(this.torso);
-    // attach torso to legs
-    //this.torso.attach(this.legs);
-  },
-  onBirth: function() {
-  },
-  is_walking: 0,
-  speed: 0,
-  faceDirection: function(dir) {
-    this.S.flip = 1;
-  },
-  onThink: function() {
-    if (this.is_walking) {
-      this.v.x += this.f[0]*this.speed;
-    }
+_: 'entity',
+n: "Player",
+S: "player:player:walk",
+// my, what an interesting name!
+onConception: function() {
+  /*this.head = game.createSprite("player:head");
+  this.torso = game.createSprite("player:torso");
+  this.legs = game.createSprite("player:legs");*/
+  // attach head to torso
+  //this.head.attach(this.torso);
+  // attach torso to legs
+  //this.torso.attach(this.legs);
+},
+onBirth: function() {
+},
+is_walking: 0,
+speed: 0,
+faceDirection: function(dir) {
+  this.S.flip = 1;
+},
+onThink: function() {
+  if (this.is_walking) {
+    this.v.x += this.f[0]*this.speed;
   }
 }

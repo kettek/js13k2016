@@ -349,7 +349,7 @@ ktk.vio = (function() {
       ktk.Filer.load('data/sprites/'+name+'.json').then(function(data) {
         // THIS IS REALLY NASTY (basically we're setting frames to inherit properties from set>animation>conf -- perhaps if we did something like "Object.assign(..frame.., (frame[...]->...), set.Conf, anim.conf, global.conf)"
         // using eval to skip extra chars required by JSON.parse
-        var sprite_datum = eval('('+data+')');
+        var sprite_datum = eval('({'+data+'})');
         sprite_datum.I = sprite_datum.I || name;
         sprite_datum.C = sprite_datum.C || {};
         for (var anim_name in sprite_datum.A) {
@@ -533,7 +533,7 @@ ktk.vio = (function() {
     if (typeof classes[name] !== 'undefined') {
       console.log('class ' + name + ' already exists, overwriting');
     }
-    var evaluated = eval('('+code+')');
+    var evaluated = eval('({'+code+'})');
     if (typeof evaluated._ !== 'undefined') {
       if (typeof classes[evaluated._] === 'undefined') {
         console.log(name + ': Warning, inherited class ' + evaluated._ + ' does not exist!');
@@ -575,7 +575,7 @@ ktk.vio = (function() {
     return new Promise(function(resolve, reject) {
       ktk.Filer.load('data/game.json').then(function(data) {
         // FIXME: don't eval!
-        var game_data = eval('('+data+')');
+        var game_data = eval('({'+data+'})');
         if (game_data.title) {
           game.title = game_data.title;
         }

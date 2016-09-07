@@ -1,38 +1,36 @@
-{
-  _: 'entity',
-  n: "brib",
-  S: "birb:birb:run",
-  sprites: [],
-  title: null,
-  onConception: function(_) {
-    title = createObject("text", "hlo, i r "+_.n, 1);
-    title.attach(this);
-  },
-  onBirth: function(_) {
-  },
-  is_walking: 0,
-  speed: 2,
-  falling: 0,
-  onThink: function(_) {
-    if (keys[37]) {
-      _.v.x -= _.speed;
-      _.S.f = 1;
-      _.S.a = 1;
-    } else if (keys[39]) {
-      _.v.x += _.speed;
-      _.S.f = 0;
-      _.S.a = 1;
-    }
-    if (keys[38] && !_.falling) {
-      _.v.y -= _.speed*4;
-    }
-    if (Math.abs(_.v.x) <= 0.2) {
-      _.S.a = 0;
-    }
-    if (Math.abs(_.v.y) != 0) {
-      _.falling = 1;
-    } else {
-      _.falling = 0;
-    }
+_: 'entity',
+n: "brib",
+S: "birb:birb:run",
+sprites: [],
+title: null,
+onConception: function(_) {
+  title = createObject("text", "hlo, i r "+_.n, 1);
+  title.attach(this);
+},
+onBirth: function(_) {
+},
+is_walking: 0,
+speed: 2,
+falling: 0,
+onThink: function(_) {
+  if (keys[37]) {
+    _.v.x -= _.speed;
+    _.S.f = 1;
+    _.S.a = 1;
+  } else if (keys[39]) {
+    _.v.x += _.speed;
+    _.S.f = 0;
+    _.S.a = 1;
+  }
+  if (keys[38] && !_.falling) {
+    _.v.y -= _.speed*4;
+  }
+  if (Math.abs(_.v.x) <= 0.2) {
+    _.S.a = 0;
+  }
+  if (Math.abs(_.v.y) != 0) {
+    _.falling = 1;
+  } else {
+    _.falling = 0;
   }
 }

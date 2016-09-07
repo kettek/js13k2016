@@ -1,10 +1,8 @@
-{
-  title: 'VIOLENCIA',
-  classes: [
-    "entity",
-    "text",
-    "player",
-    "birb",
-    "demon"
-  ]
-}
+title: 'VIOLENCIA',
+classes: [
+  "entity",
+  "text",
+  "player",
+  "birb",
+  "demon"
+]
