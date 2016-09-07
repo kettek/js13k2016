@@ -105,6 +105,25 @@ ktk.Filer = (function() {
   };
 })();
 
+function cloneObject(c) {
+  var r;
+  if (c instanceof Array) {
+    r = [];
+  } else if (c instanceof Object) {
+    r = {};
+  } else {
+    return c;
+  }
+  for (p in c) {
+    if (!(c[p] instanceof Function)) {
+      r[p] = cloneObject(c[p]);
+    } else {
+      r[p] = c[p];
+    }
+  }
+  return r;
+}
+
 ktk.vio = (function() {
 /*,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
   RENDERING
@@ -428,6 +447,9 @@ ktk.vio = (function() {
     } else {
       removeSpriteFromQuadrant(sprite);
     }
+    for (i in sprite.children) {
+      deleteSprite(sprite.children[i]);
+    }
   }
 /*,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
   ENGINE
@@ -531,7 +553,7 @@ ktk.vio = (function() {
     if (typeof classes[name] === 'undefined') {
       console.log('Error, class ' + name + ' does not exist!');
     } else {
-      object = Object.create(classes[name]);
+      object = cloneObject(classes[name]);
     }
     // TODO: game object id
     if (object.sprite) object.sprite = createSprite(object.sprite, 16, 16, 0);
@@ -546,6 +568,9 @@ ktk.vio = (function() {
   function destroyObject(object) {
     object.sprite?deleteSprite(object.sprite):0;
     game.objects.splice(game.objects.indexOf(object), 1);
+    for (i in object.c) {
+      destroyObject(object.c[i]);
+    }
   }
   /* ==== Game Logic ==== */
   function loadGameData() {

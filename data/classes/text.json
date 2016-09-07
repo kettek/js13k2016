@@ -13,7 +13,6 @@
   set: function(text) {
     var _ = this;
     var t = text.split('');
-    console.log(t.length + ' vs ' + (_.ss.length));
     var i = 0;
     for (i in t) {
       if (_.ss[i]) {
