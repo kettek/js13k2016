@@ -124,7 +124,7 @@ function cloneObject(c) {
   return r;
 }
 
-ktk.vio = (function() {
+(function(){
 /*,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
   RENDERING
   ``````````````````````````````````````````````````````````````````````````````
@@ -473,6 +473,12 @@ ktk.vio = (function() {
   var classes = [];
   classes_pending = [];
 
+  var game_data = {
+    title: 'VIOLENCIA',
+    classes: [
+      "entity","text","birb","demon"
+    ]
+  };
   var game = {
     players: [], // id: {name, stats, object}
     objects: [],
@@ -573,25 +579,16 @@ ktk.vio = (function() {
   /* ==== Game Logic ==== */
   function loadGameData() {
     return new Promise(function(resolve, reject) {
-      ktk.Filer.load('data/game.json').then(function(data) {
-        // FIXME: don't eval!
-        var game_data = eval('({'+data+'})');
-        if (game_data.title) {
-          game.title = game_data.title;
-        }
-        if (game_data.classes) {
-          loadClasses(game_data.classes).then(function() {
-            console.log('loaded all classes!');
-            resolve();
-          }, function(error) {
-            console.log("Failed to load classes: " + error);
-            reject();
-          });
-        }
+      loadClasses(game_data.classes).then(function() {
+        console.log('loaded all classes!');
+        resolve();
       }, function(error) {
-        console.log("Failed to load game data: " + error);
+        console.log("Failed to load classes: " + error);
         reject();
       });
+    }, function(error) {
+      console.log("Failed to load game data: " + error);
+      reject();
     });
   }
   /* ==== Loops ==== */
@@ -629,7 +626,6 @@ ktk.vio = (function() {
       this.menus[0]=createObject('text');
       this.menus[0].S.y = 10;
       this.menus[0].S.x = 13*8;
-      console.log(this.menus[0]);
       this.menus[1]=createObject('text');
       this.menus[1].S.y = 32;
       this.menus[1].S.x = 13*8;
@@ -764,9 +760,9 @@ ktk.vio = (function() {
     state.onInit();
   }
 
-  return {
-    gogogo: onInit
-  }
+  window.addEventListener('load', onInit);
+  window['sprite_data']=sprite_data;
+  window['createSprite']=createSprite;
+  window['createObject']=createObject;
+  window['keys']=keys;
 })();
-
-window.addEventListener('load', ktk.vio.gogogo);
