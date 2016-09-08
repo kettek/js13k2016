@@ -1,8 +1,0 @@
-title: 'VIOLENCIA',
-classes: [
-  "entity",
-  "text",
-  "player",
-  "birb",
-  "demon"
-]
