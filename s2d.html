@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>vio: sprite2data</title>
+<style type="text/css">
+* {
+  box-sizing: border-box;
+}
+html,body {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+canvas {
+  image-rendering: crisp-edges;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: optimize-contrast;
+  -ms-interpolation-mode: nearest-neighbor;
+  border: 1px solid black;
+  margin: 0; padding: 0;
+}
+#drop_image, #drop_points {
+  padding: 1em;
+  background-color: #779;
+}
+#view {
+  float: right;
+  right: 0;
+  top: 0;
+  width: 65%;
+  height: 100%;
+}
+#left {
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 100%;
+  padding: 1em;
+}
+#controls {
+  border: 1px solid black;
+}
+#tree {
+  border:1px solid black;
+  overflow: auto;
+  max-height: 100%;
+}
+ul {
+  padding-left: 1em;
+  border: 1px solid rgba(128, 128, 196, 0.1);
+  background-color: rgba(128, 128, 196, 0.1);
+}
+li {
+  list-style: none;
+}
+input[type="button"] {
+  margin: 0.25em;
+  border: 1px solid rgba(196, 196, 32, 0.5);
+  background-color: rgba(196, 196, 32, 0.5);
+}
+input[type="number"] {
+  margin: 0.25em;
+  border: 1px solid rgb(224, 224, 128);
+}
+input[type='text'] {
+  width: 6em;
+}
+</style>
+<script type="text/javascript">
+
+function Branch(parent, content) {
+  this.element = document.createElement('li');
+  this.title_element = document.createElement('span');
+
+  this.text_element = document.createElement('span');
+  this.text_element.innerHTML = content;
+  this.branch_element = null;
+  this.hide_element = null;
+
+  this.elements = [];
+
+  this.branches = [];
+  this.branch_map = {};
+  this.input_map = {};
+
+  this.title_element.branch = this;
+  this.title_element.appendChild(this.text_element);
+  this.element.appendChild(this.title_element);
+
+  this.parent = parent;
+  this.element.branch = this;
+  if (parent instanceof HTMLElement) {
+    parent.appendChild(this.element);
+  } else {
+    parent.branch_element.appendChild(this.element);
+  }
+}
+Branch.prototype.addHandler = function(type, cb) {
+  this.element.addEventListener(type, cb);
+}
+Branch.prototype.getInput = function(id) {
+  return this.input_map[id];
+}
+Branch.prototype.setInput = function(id, value) {
+  var input = this.getInput(id);
+  if (input) {
+    if (input.type == 'checkbox') {
+      input.checked = (value == 0 ? true : false);
+    } else {
+      input.value = value;
+    }
+  }
+}
+Branch.prototype.addInput = function(type, id, value, cb) {
+  var input_element = document.createElement('input');
+  input_element.type = type || 'text';
+  if (type == 'number') {
+    input_element.style.width = '4em';
+  } else if (type == 'text') {
+    input_element.style.width = '6em';
+  }
+  input_element.autocomplete = 'off';
+  input_element.id = id || '';
+  input_element.name = id || '';
+  input_element.value = value;
+  if (cb) input_element.addEventListener('change', cb);
+  if (cb) input_element.addEventListener('click', cb);
+
+  if (id) this.input_map[id] = input_element;
+  this.title_element.appendChild(input_element);
+  this.elements.push(input_element);
+  return this;
+}
+Branch.prototype.addText = function(value) {
+  var text_element = document.createElement('span');
+  text_element.innerText = value;
+  this.title_element.appendChild(text_element);
+  this.elements.push(text_element);
+  return this;
+}
+Branch.prototype.implode = function() {
+  for (i in this.branches) {
+    this.branches[i].implode();
+  }
+  if (!(this.parent instanceof HTMLElement)) {
+    this.parent.branches.splice(this.parent.branches.indexOf(this), 1);
+  }
+  if (this.element.parentElement) this.element.parentElement.removeChild(this.element);
+}
+Branch.prototype.showBranches = function() {
+  if (this.branch_element) this.branch_element.style.display = 'block';
+}
+Branch.prototype.hideBranches = function() {
+  if (this.branch_element) this.branch_element.style.display = 'none';
+}
+Branch.prototype.moveUp = function() {
+  var e;
+  if (this.parent instanceof HTMLElement) {
+    e = this.parent;
+  } else {
+    e = this.parent.element;
+  }
+  if (this.element.previousSibling) e.insertBefore(this.element, this.element.previousSibling);
+}
+Branch.prototype.moveDown = function() {
+  var p;
+  if (this.parent instanceof HTMLElement) {
+    p = this.parent;
+  } else {
+    p = this.parent.element;
+  }
+  var e = this.element.nextSibling;
+  if (!e) return;
+  e = e.nextSibling;
+  if (e) p.insertBefore(this.element, e);
+  else p.appendChild(this.element);
+}
+Branch.prototype.getBranch = function(name) {
+  return this.branch_map[name];
+}
+Branch.prototype.addBranch = function(content) {
+  if (this.branches.length == 0) {
+    this.hide_element = document.createElement('input');
+    var _ = this;
+    this.hide_element.type = 'checkbox';
+    this.hide_element.checked = true;
+    this.hide_element.addEventListener('change', function(e) {
+        if (e.target.checked) {
+          _.showBranches();
+        } else {
+          _.hideBranches();
+        }
+    });
+    this.element.insertBefore(this.hide_element, this.title_element);
+  }
+  if (!this.branch_element) {
+    this.branch_element = document.createElement('ul');
+    this.element.appendChild(this.branch_element);
+  }
+  this.branches.push(new Branch(this, content));
+  this.branch_map[content] = this.branches[this.branches.length-1];
+  return this.branches[this.branches.length-1];
+}
+
+var sprite_data_filename = 'sprite.json';
+var sprite_data = {C: {}, A: {}};
+anim = '';
+set = '';
+frame = 0;
+var frame_branch = null;
+
+function parseConfBranch(c) {
+  var o = {};
+  for (i in c) {
+    var e = c[i].title_element.children[1];
+    if (e.name == 'a') { 
+      o[e.name] = e.checked ? 1 : 0;
+    } else {
+      o[e.name] = e.value;
+    }
+  }
+  return o;
+}
+
+function getVal(val) {
+  if (typeof val !== 'undefined') return val;
+  return '';
+}
+
+function syncDataToTree() {
+  createTree();
+  disableSync();
+  var conf = tree.getBranch('Configuration');
+  conf.getBranch('X: ').setInput('x', getVal(sprite_data.C.x));
+  conf.getBranch('Y: ').setInput('y', getVal(sprite_data.C.y));
+  conf.getBranch('Width: ').setInput('w', getVal(sprite_data.C.w));
+  conf.getBranch('Height: ').setInput('h', getVal(sprite_data.C.h));
+  conf.getBranch('Frametime: ').setInput('t', getVal(sprite_data.C.t));
+  conf.getBranch('Animate: ').setInput('a', sprite_data.C.a?true:false);
+  var A = tree.getBranch('<b>Animations:</b> ');
+  var a_i = 0;
+  for (i in sprite_data.A) {
+    s_A = sprite_data.A[i];
+    if (!sprite_data.A.hasOwnProperty(i)) continue;
+    var evt = new Event('click');
+    A.getInput('add').dispatchEvent(evt);
+    //
+    var a = A.branches[a_i++];
+    a.setInput('name', i);
+    var conf = a.getBranch('Configuration');
+    if (!s_A.C) s_A.C = {};
+    conf.getBranch('X: ').setInput('x', getVal(s_A.C.x));
+    conf.getBranch('Y: ').setInput('y', getVal(s_A.C.y));
+    conf.getBranch('Width: ').setInput('w', getVal(s_A.C.w));
+    conf.getBranch('Height: ').setInput('h', getVal(s_A.C.h));
+    conf.getBranch('Frametime: ').setInput('t', getVal(s_A.C.t));
+    conf.getBranch('Animate: ').setInput('a', s_A.C.a?true:false || true);
+    var S = a.getBranch('<b>Sets:</b> ');
+    var s_i = 0;
+    for (i in s_A.S) {
+      s_S = s_A.S[i];
+      var evt = new Event('click');
+      S.getInput('add').dispatchEvent(evt);
+      //
+      var s = S.branches[s_i++];
+      s.setInput('name', i);
+      var conf = s.getBranch('Configuration');
+      if (!s_S.C) s_S.C = {};
+      conf.getBranch('X: ').setInput('x', getVal(s_S.C.x));
+      conf.getBranch('Y: ').setInput('y', getVal(s_S.C.y));
+      conf.getBranch('Width: ').setInput('w', getVal(s_S.C.w));
+      conf.getBranch('Height: ').setInput('h', getVal(s_S.C.h));
+      conf.getBranch('Frametime: ').setInput('t', getVal(s_S.C.t));
+      conf.getBranch('Animate: ').setInput('a', s_S.C.a?true:false || true);
+      var F = s.getBranch('<b>Frames:</b> ');
+      for (i in s_S.F) {
+        s_F = s_S.F[i];
+        var evt = new Event('click');
+        F.getInput('add').dispatchEvent(evt);
+        //
+        var f = F.branches[F.branches.length-1];
+        f.setInput('x', getVal(s_F[0]));
+        f.setInput('y', getVal(s_F[1]));
+        f.setInput('w', getVal(s_F[2]));
+        f.setInput('h', getVal(s_F[3]));
+        f.setInput('t', getVal(s_F[4]));
+      }
+    }
+  }
+  enableSync();
+  syncData();
+}
+
+function createTree() {
+  if (tree) tree.implode();
+  tree = new Branch(document.getElementById('tree'), 'Sprite: ').addInput("text", "name", "");
+  var conf = tree.addBranch('Configuration');
+  conf.addBranch("X: ").addInput("number", "x", '', syncData);
+  conf.addBranch("Y: ").addInput("number", "y", '', syncData);
+  conf.addBranch("Width: ").addInput("number", "w", '', syncData);
+  conf.addBranch("Height: ").addInput("number", "h", '', syncData);
+  conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
+  conf.addBranch("Animate: ").addInput("checkbox", "a", '', syncData);
+  var animations = tree.addBranch('<b>Animations:</b> ');
+  animations.addInput('button', 'add', '+', function(cb) {
+    var anim = animations.addBranch('')
+    anim.addInput('radio', 'anim', '', function(cb) {
+      setAnim(anim.getInput("name").value);
+    });
+    anim.addInput("text", "name", '', function() {
+      syncData();
+      setAnim(anim.getInput("name").value);
+    });
+    anim.addText("   ").addInput("button", "delete", ' del', function(cb) {
+      anim.implode();
+      syncData();
+    });
+    anim.addInput('button', 'up', '^', function(cb) {
+      anim.moveUp();
+      syncData();
+    });
+    anim.addInput('button', 'down', 'v', function(cb) {
+      anim.moveDown();
+      syncData();
+    });
+    anim.addHandler('click', function(e) {
+      setAnim(anim.getInput("name").value);
+    });
+
+    var conf = anim.addBranch("Configuration");
+    conf.addBranch("X: ").addInput("number", "x", '', syncData);
+    conf.addBranch("Y: ").addInput("number", "y", '', syncData);
+    conf.addBranch("Width: ").addInput("number", "w", '', syncData);
+    conf.addBranch("Height: ").addInput("number", "h", '', syncData);
+    conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
+    conf.addBranch("Animate: ").addInput("checkbox", "a", '', syncData);
+    var sets = anim.addBranch('<b>Sets:</b> ');
+
+    sets.addInput('button', 'add', '+', function(cb) {
+      var set = sets.addBranch('');
+      set.addInput('radio', 'set', '', function(cb) {
+        setSet(set.getInput("name").value);
+      });
+
+      set.addInput('text', 'name', '', function() {
+        syncData();
+        setSet(set.getInput("name").value);
+      });
+      set.addText("   ").addInput("button", "delete", ' del', function(cb) {
+        set.implode();
+        syncData();
+      });
+      set.addHandler('click', function(e) {
+        setSet(set.getInput("name").value);
+      });
+      set.addInput('button', 'up', '^', function(cb) {
+        set.moveUp();
+        syncData();
+      });
+      set.addInput('button', 'down', 'v', function(cb) {
+        set.moveDown();
+        syncData();
+      });
+
+      var conf = set.addBranch("Configuration");
+      conf.addBranch("X: ").addInput("number", "x", '', syncData);
+      conf.addBranch("Y: ").addInput("number", "y", '', syncData);
+      conf.addBranch("Width: ").addInput("number", "w", '', syncData);
+      conf.addBranch("Height: ").addInput("number", "h", '', syncData);
+      conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
+      conf.addBranch("Animate: ").addInput("checkbox", "a", '', syncData);
+      var frames = set.addBranch('<b>Frames:</b> ');
+      frames.addInput('button', 'add', '+', function(cb) {
+        var frame = frames.addBranch('');
+        frame.addHandler('click', function(e) {
+          var i = frames.branches.indexOf(frame);
+          setFrame(i);
+          frame_branch = frame;
+        });
+        frame.addInput('radio', 'frame', '', function(cb) {
+          var i = frames.branches.indexOf(frame);
+          setFrame(i);
+          frame_branch = frame;
+        });
+        frame.addInput('number', 'x', '', syncData).addInput('number', 'y', '', syncData).addInput('number', 'w', '', syncData).addInput('number', 'h', '', syncData).addInput('number', 'ms', '', syncData).addInput('button', '', '-', function(cb) {
+          frame.implode();
+          syncData();
+        });
+        frame.addInput('button', 'up', '^', function(cb) {
+          frame.moveUp();
+          syncData();
+        });
+        frame.addInput('button', 'down', 'v', function(cb) {
+          frame.moveDown();
+          syncData();
+        });
+        syncData();
+      });
+      syncData();
+    });
+    syncData();
+  });
+
+}
+
+var can_sync = true;
+
+function disableSync() {
+  can_sync = false;
+}
+function enableSync() {
+  can_sync = true;
+}
+
+function syncData() {
+  if (!can_sync) return;
+  sprite_data = {C: {}, A: {}};
+  // read conf
+  sprite_data.C = parseConfBranch(tree.branches[0].branches);
+  // read animations
+  sprite_data.A = {};
+  for (i in tree.branches[1].branches) {
+    var A = tree.branches[1].branches[i];
+    var A_name = A.title_element.children[2].value;
+    sprite_data.A[A_name] = {C: {}, S:{}};
+    sprite_data.A[A_name].C = parseConfBranch(A.branches[0].branches);
+    Object.assign(sprite_data.A[A_name].C, sprite_data.C, sprite_data.A[A_name].C);
+    // parse sets
+    for (i in A.branches[1].branches) {
+      var S = A.branches[1].branches[i];
+      var S_name = S.title_element.children[2].value;
+      sprite_data.A[A_name].S[S_name] = {C: {}, F: []};
+      sprite_data.A[A_name].S[S_name].C = parseConfBranch(S.branches[0].branches);
+      Object.assign(sprite_data.A[A_name].S[S_name].C, sprite_data.A[A_name].C, sprite_data.A[A_name].S[S_name].C);
+      // parse frames
+      var j = 0;
+      for (i in S.branches[1].branches) {
+        var F = S.branches[1].branches[i];
+        var vals = F.title_element.children;
+        var frame = {};
+        frame.x = parseInt(vals[2].value || sprite_data.A[A_name].S[S_name].C.x || 0);
+        frame.y = parseInt(vals[3].value || sprite_data.A[A_name].S[S_name].C.y || 0);
+        frame.w = parseInt(vals[4].value || sprite_data.A[A_name].S[S_name].C.w || 16);
+        frame.h = parseInt(vals[5].value || sprite_data.A[A_name].S[S_name].C.h || 16);
+        frame.t = parseInt(vals[6].value || sprite_data.A[A_name].S[S_name].C.t || 100);
+        sprite_data.A[A_name].S[S_name].F.push(frame);
+        j++;
+      }
+    }
+  }
+}
+
+function setAnim(anim_) {
+  document.getElementById('i_anim').value = anim;
+  anim = anim_;
+}
+function setSet(set_) {
+  document.getElementById('i_set').value = set;
+  set = set_;
+}
+function setFrame(frame_) {
+  document.getElementById('i_frame').value = frame;
+  frame = frame_;
+  s_frame = sprite_data.A[anim].S[set].F[frame];
+  if (s_frame) {
+    frame_draw.do_draw = 1;
+    frame_draw.x = s_frame.x;
+    frame_draw.y = s_frame.y;
+    frame_draw.w = s_frame.w;
+    frame_draw.h = s_frame.h;
+    frame_draw.t = s_frame.t;
+    drawCanvas();
+  } else {
+    frame_draw.do_draw = 0;
+  }
+}
+
+var tree;
+var frame_draw = { do_draw: 0, x: 0, y: 0, w: 0, h: 0 };
+var mouse = { held: 0, sx: 0, sy: 0, ex: 0, ey: 0 };
+
+var canvas, ctx, cboard, img, img_loaded, points, points_loaded, zoom;
+
+var c_preview, p_ctx;
+function drawPreview() {
+  p_ctx.clearRect(0, 0, c_preview.width, c_preview.height);
+  if (img_loaded) {
+    var a = sprite_data.A[anim];
+    if (!a) return;
+    var s = a.S[set];
+    if (!s) return;
+    var f = s.F[frame];
+    if (!f) return;
+
+    console.log(f);
+    p_ctx.drawImage(img, f.x, f.y, f.w||1, f.h||1, 0, 0, f.w, f.h);
+  }
+}
+
+function drawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(cboard, 0, 0);
+  if (img_loaded) ctx.drawImage(img, 0, 0, img.width, img.height);
+  if (points_loaded) ctx.drawImage(points, 0, 0, points.width, points.height);
+  if (mouse.held) {
+    var x = Math.floor(mouse.sx/zoom);
+    var y = Math.floor(mouse.sy/zoom);
+    var w = Math.floor(mouse.ex/zoom - mouse.sx/zoom);
+    var h = Math.floor(mouse.ey/zoom - mouse.sy/zoom);
+    ctx.strokeStyle = "#FFFF00";
+    // THE MYSTERIES OF HTML5 CANVII
+    ctx.strokeRect(x+0.5, y+0.5, w, h);
+  }
+  if (frame_draw.do_draw) {
+    ctx.strokeStyle = "#00FFFF";
+    ctx.strokeRect(frame_draw.x+0.5, frame_draw.y+0.5, frame_draw.w, frame_draw.h);
+  }
+}
+
+var is_playing = false;
+var play_timer = null;
+
+function playAnim() {
+  if (!is_playing) return;
+
+  var a = sprite_data.A[anim];
+  if (!a) return;
+  var s = a.S[set];
+  if (!s) return;
+
+  if (frame >= s.F.length-1) {
+    frame = 0;
+  } else {
+    frame++;
+  }
+  document.getElementById('i_frame').value = frame;
+  s_frame = s.F[frame];
+  frame_draw.do_draw = 0;
+  if (!s_frame) return;
+  drawPreview();
+
+  frame_draw.do_draw = 1;
+  frame_draw.x = s_frame.x;
+  frame_draw.y = s_frame.y;
+  frame_draw.w = s_frame.w;
+  frame_draw.h = s_frame.h;
+  frame_draw.t = s_frame.t;
+
+  drawCanvas();
+  play_timer = setTimeout(playAnim, s_frame.t);
+}
+function stopAnim() {
+  is_playing = false;
+  if (play_timer) clearTimeout(play_timer);
+}
+
+function gogogo() {
+  anim = document.getElementById('i_anim').value;
+  set = document.getElementById('i_set').value;
+  frame = document.getElementById('i_frame').value;
+  document.getElementById('play').addEventListener('click', function() {
+    is_playing = true;
+    playAnim();
+  });
+  document.getElementById('stop').addEventListener('click', stopAnim);
+  createTree();
+  // checkboard generation
+  cboard = new Image();
+  cboard.onload = function() {
+    drawCanvas();
+  }
+  function createCBoard() {
+    c_offscreen.width = canvas.width;
+    c_offscreen.height = canvas.height;
+    o_ctx.clearRect(0, 0, c_offscreen.width, c_offscreen.height)
+    var w = Math.floor(c_offscreen.width/8);
+    var h = Math.floor(c_offscreen.height/8);
+    for (x = 0; x < w; x++) {
+      for (y = 0; y < h; y++) {
+        o_ctx.fillStyle = (x+y)%2 ? '#AAA' : '#CCC';
+        o_ctx.fillRect(x*8,y*8,8,8);
+      }
+    }
+    cboard.src = c_offscreen.toDataURL();
+  }
+  // animation preview
+
+  //
+  c_offscreen = document.createElement('canvas');
+  o_ctx = c_offscreen.getContext('2d');
+  // begin actual view
+  c_preview = document.getElementById('preview');
+  c_preview.width = 16;
+  c_preview.height = 16;
+  c_preview.style.width = 32+'px';
+  c_preview.style.height = 32+'px';
+  p_ctx = c_preview.getContext('2d');
+  canvas = document.getElementById('display');
+  ctx = canvas.getContext('2d');
+  ctx.lineWidth=1;
+  img = new Image();
+  img_loaded = false;
+  points = new Image();
+  points_loaded = false;
+  zoom = 3;
+  // canvas mouse handling
+  function mousedownCanvas(e) {
+    mouse.held = 1;
+    mouse.sx = e.layerX-canvas.offsetLeft;
+    mouse.sy = e.layerY-canvas.offsetTop;
+  }
+  canvas.addEventListener('mousedown', mousedownCanvas);
+  function mouseupCanvas(e) {
+    mouse.held = 0;
+    mouse.ex = e.layerX-canvas.offsetLeft;
+    mouse.ey = e.layerY-canvas.offsetTop;
+    if (frame_branch) {
+      var sx = Math.min(mouse.ex, mouse.sx);
+      var sy = Math.min(mouse.ey, mouse.sy);
+      var w = Math.abs(mouse.ex-mouse.sx);
+      var h = Math.abs(mouse.ey-mouse.sy);
+      frame_branch.setInput('x', Math.floor(sx/zoom));
+      frame_branch.setInput('y', Math.floor(sy/zoom));
+      frame_branch.setInput('w', Math.floor(w/zoom));
+      frame_branch.setInput('h', Math.floor(h/zoom));
+      syncData();
+    }
+    drawCanvas();
+  }
+  canvas.addEventListener('mouseup', mouseupCanvas);
+  function mousemoveCanvas(e) {
+    if (!mouse.held) return;
+    mouse.ex = e.layerX-canvas.offsetLeft;
+    mouse.ey = e.layerY-canvas.offsetTop;
+    drawCanvas();
+  }
+  canvas.addEventListener('mousemove', mousemoveCanvas);
+  // canvas <-> image
+  function loadImage() {
+    drawCanvas();
+  }
+  function loadPoints() {
+    drawCanvas();
+  }
+  function loadData(data_) {
+    sprite_data = eval('({'+data_+'})');
+    syncDataToTree();
+  }
+  function resizeDisplay() {
+    var w = window.getComputedStyle(document.getElementById('view'), null);
+    var d_w = parseInt(w.getPropertyValue('width'));
+    var d_h = parseInt(w.getPropertyValue('height')) - parseInt(c_preview.style.height);
+
+    canvas.width = d_w/zoom;
+    canvas.height = d_h/zoom;
+    canvas.style.width = d_w+'px'
+    canvas.style.height = d_h+'px'
+    createCBoard();
+  }
+  resizeDisplay();
+  window.addEventListener('resize', resizeDisplay, false);
+  // disable default window dropping
+  window.addEventListener('dragover', function(evt) { evt.preventDefault(); }, false); window.addEventListener('drop', function(evt) { evt.preventDefault(); }, false);
+  // add our handlers
+  document.getElementById('view').addEventListener('drop', function(evt) {
+    evt.preventDefault();
+    var files = evt.dataTransfer.files;
+    if (files.length > 0) {
+      var file = files[0];
+      if (typeof FileReader !== 'undefined' && file.type.indexOf('image') != -1) {
+        var reader = new FileReader;
+        reader.onload = function(evt) {
+          img.onload = loadImage;
+          img_loaded = 1;
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }, false);
+  document.getElementById('left').addEventListener('drop', function(evt) {
+    evt.preventDefault();
+    var files = evt.dataTransfer.files;
+    if (files.length > 0) {
+      var file = files[0];
+      if (typeof FileReader !== 'undefined' && file.type.indexOf('image') != -1) {
+        var reader = new FileReader;
+        reader.onload = function(evt) {
+          points.onload = loadPoints;
+          points.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }, false);
+  document.getElementById('left').addEventListener('drop', function(evt) {
+    evt.preventDefault();
+    var files = evt.dataTransfer.files;
+    if (files.length > 0) {
+      var file = files[0];
+      sprite_data_filename = file.name;
+      if (typeof FileReader !== 'undefined') {
+        var reader = new FileReader;
+        reader.onload = function(evt) {
+          loadData(evt.target.result);
+        };
+        reader.readAsText(file);
+      }
+    }
+  }, false);
+  document.getElementById('save').addEventListener('click', function() {
+    var a = document.createElement('a');
+    var str = JSON.stringify(sprite_data);
+    str = str.slice(1, str.length-1); // cut off '{' and '}'
+    var file = new Blob([str], {type: 'text/javascript'});
+    var url = URL.createObjectURL(file);
+    a.href = url;
+    a.download = sprite_data_filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url);
+    }, 0);
+  }, false);
+}
+
+window.onload = gogogo;
+</script>
+</head>
+<body>
+<div id="view"><canvas id="preview"></canvas><canvas id="display"></canvas></div>
+<div id="left">
+<div id="controls">
+<button id="save">Save</button>
+  <label>Animation: <input type="text" id="i_anim"/></label>
+  <label>Set: <input type="text" id="i_set"/></label>
+  <label>Frame: <input type="text" id="i_frame"/></label>
+
+  <button id="stop">Stop</button><button id="play">Play</button>
+</div>
+<div id="tree">
+</div>
+</div>
+</body>
