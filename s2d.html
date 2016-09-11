@@ -17,6 +17,7 @@ canvas {
   image-rendering: -moz-crisp-edges;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: optimize-contrast;
+  image-rendering: pixelated;
   -ms-interpolation-mode: nearest-neighbor;
   border: 1px solid black;
   margin: 0; padding: 0;
@@ -463,6 +464,9 @@ function setSet(set_) {
 function setFrame(frame_) {
   document.getElementById('i_frame').value = frame;
   frame = frame_;
+  setFrameDraw();
+}
+function setFrameDraw() {
   s_frame = sprite_data.A[anim].S[set].F[frame];
   if (s_frame) {
     frame_draw.do_draw = 1;
@@ -494,7 +498,6 @@ function drawPreview() {
     var f = s.F[frame];
     if (!f) return;
 
-    console.log(f);
     p_ctx.drawImage(img, f.x, f.y, f.w||1, f.h||1, 0, 0, f.w, f.h);
   }
 }
@@ -515,7 +518,7 @@ function drawCanvas() {
   }
   if (frame_draw.do_draw) {
     ctx.strokeStyle = "#00FFFF";
-    ctx.strokeRect(frame_draw.x+0.5, frame_draw.y+0.5, frame_draw.w, frame_draw.h);
+    ctx.strokeRect(frame_draw.x+0.5, frame_draw.y+0.5, frame_draw.w-1, frame_draw.h-1);
   }
 }
 
@@ -590,6 +593,11 @@ function gogogo() {
   //
   c_offscreen = document.createElement('canvas');
   o_ctx = c_offscreen.getContext('2d');
+  o_ctx.mozImageSmoothingEnabled = false;
+  o_ctx.webkitImageSmoothingEnabled = false;
+  o_ctx.msImageSmoothingEnabled = false;
+  o_ctx.imageSmoothingEnabled = false;
+
   // begin actual view
   c_preview = document.getElementById('preview');
   c_preview.width = 16;
@@ -597,8 +605,18 @@ function gogogo() {
   c_preview.style.width = 32+'px';
   c_preview.style.height = 32+'px';
   p_ctx = c_preview.getContext('2d');
+  p_ctx.mozImageSmoothingEnabled = false;
+  p_ctx.webkitImageSmoothingEnabled = false;
+  p_ctx.msImageSmoothingEnabled = false;
+  p_ctx.imageSmoothingEnabled = false;
+
   canvas = document.getElementById('display');
   ctx = canvas.getContext('2d');
+  ctx.mozImageSmoothingEnabled = false;
+  ctx.webkitImageSmoothingEnabled = false;
+  ctx.msImageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = false;
+
   ctx.lineWidth=1;
   img = new Image();
   img_loaded = false;
@@ -607,33 +625,42 @@ function gogogo() {
   zoom = 3;
   // canvas mouse handling
   function mousedownCanvas(e) {
+    e.preventDefault();
     mouse.held = 1;
-    mouse.sx = e.layerX-canvas.offsetLeft;
-    mouse.sy = e.layerY-canvas.offsetTop;
+    mouse.sx = e.offsetX;
+    mouse.sy = e.offsetY;
   }
   canvas.addEventListener('mousedown', mousedownCanvas);
   function mouseupCanvas(e) {
+    e.preventDefault();
     mouse.held = 0;
-    mouse.ex = e.layerX-canvas.offsetLeft;
-    mouse.ey = e.layerY-canvas.offsetTop;
+    mouse.ex = e.offsetX;
+    mouse.ey = e.offsetY;
     if (frame_branch) {
       var sx = Math.min(mouse.ex, mouse.sx);
       var sy = Math.min(mouse.ey, mouse.sy);
       var w = Math.abs(mouse.ex-mouse.sx);
       var h = Math.abs(mouse.ey-mouse.sy);
-      frame_branch.setInput('x', Math.floor(sx/zoom));
-      frame_branch.setInput('y', Math.floor(sy/zoom));
-      frame_branch.setInput('w', Math.floor(w/zoom));
-      frame_branch.setInput('h', Math.floor(h/zoom));
+      var x = Math.floor((sx-0.5)/zoom);
+      x = x < 0 ? 0 : x;
+      var y = Math.floor((sy-0.5)/zoom);
+      y = y < 0 ? 0 : y;
+      frame_branch.setInput('x', x);
+      frame_branch.setInput('y', y);
+      frame_branch.setInput('w', Math.round(w/zoom+0.5));
+      frame_branch.setInput('h', Math.round(h/zoom+0.5));
       syncData();
     }
+    setFrameDraw();
     drawCanvas();
+    drawPreview();
   }
   canvas.addEventListener('mouseup', mouseupCanvas);
   function mousemoveCanvas(e) {
+    e.preventDefault();
     if (!mouse.held) return;
-    mouse.ex = e.layerX-canvas.offsetLeft;
-    mouse.ey = e.layerY-canvas.offsetTop;
+    mouse.ex = e.offsetX;
+    mouse.ey = e.offsetY;
     drawCanvas();
   }
   canvas.addEventListener('mousemove', mousemoveCanvas);
@@ -659,6 +686,12 @@ function gogogo() {
     canvas.style.height = d_h+'px'
     createCBoard();
   }
+  function setZoom(val) {
+    zoom = parseInt(val);
+    resizeDisplay();
+    drawCanvas();
+  }
+
   resizeDisplay();
   window.addEventListener('resize', resizeDisplay, false);
   // disable default window dropping
@@ -725,13 +758,17 @@ function gogogo() {
       window.URL.revokeObjectURL(url);
     }, 0);
   }, false);
+  document.getElementById('zoom').addEventListener('change', function(e) {
+    setZoom(parseInt(e.target.value));
+  });
+  setZoom(parseInt(document.getElementById('zoom').value));
 }
 
 window.onload = gogogo;
 </script>
 </head>
 <body>
-<div id="view"><canvas id="preview"></canvas><canvas id="display"></canvas></div>
+<div id="view"><canvas id="preview"></canvas> <label for="zoom">Zoom: <input type="number" id="zoom" value="3"/></label><canvas id="display"></canvas></div>
 <div id="left">
 <div id="controls">
 <button id="save">Save</button>
