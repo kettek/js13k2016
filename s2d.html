@@ -226,7 +226,7 @@ Branch.prototype.getBranch = function(name) {
   return this.branch_map[name];
 }
 Branch.prototype.addBranch = function(content) {
-  if (this.branches.length == 0) {
+  if (!this.hide_element) {
     this.hide_element = document.createElement('input');
     var _ = this;
     this.hide_element.type = 'checkbox';
@@ -360,6 +360,36 @@ function syncDataToTree() {
   }
   enableSync();
   syncData();
+}
+
+function getPNodes() {
+}
+
+function createPNode(parent) {
+  var pnode = parent.addBranch('');
+  pnode.addText('Animation: ');
+  pnode.addInput('text', 'anim', '', function(cb) {
+  });
+  pnode.addText('Offset: ');
+  pnode.addInput('number', 'offset', '0', function(cb) {
+  });
+  pnode.addInput("button", "delete", '-', function(cb) {
+    pnode.implode();
+  });
+  pnode.addInput("button", "add", "add attach", function(cb) {
+    createPNode(pnode);
+  });
+}
+
+function createPTree() {
+  if (ptree) ptree.implode();
+  ptree = new Branch(document.getElementById('ptree'), 'Animations: ');
+  ptree.addText(' Set: ');
+  ptree.addInput('text', 'set', '', function(cb) {
+  });
+  ptree.addInput('button', 'add', '+', function(cb) {
+    createPNode(ptree);
+  });
 }
 
 function createTree() {
@@ -608,7 +638,7 @@ function setFrameDraw() {
   }
 }
 
-var tree;
+var tree, ptree;
 var frame_draw = { do_draw: 0, x: 0, y: 0, w: 0, h: 0 };
 var mouse = { held: 0, sx: 0, sy: 0, ex: 0, ey: 0 };
 var canvas_offset = { x: 0, y: 0 };
@@ -700,6 +730,7 @@ function gogogo() {
   });
   document.getElementById('stop').addEventListener('click', stopAnim);
   createTree();
+  createPTree();
   // checkboard generation
   cboard = new Image();
   cboard.onload = function() {
@@ -1032,6 +1063,7 @@ Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<in
 <br>
 <button id="map_datapoints">Map Attachment Points</button>
 </div>
+<div id="ptree"></div>
 <div id="tree">
 </div>
 </div>
