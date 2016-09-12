@@ -100,6 +100,8 @@ input[type='text'] {
 }
 </style>
 <script type="text/javascript">
+// I guess this will work...? it might not be by value, so a function returning false or true might be wiser
+window.CanvasRenderingContext2D.imageSmoothingEnabled = window.CanvasRenderingContext2D.imageSmoothingEnabled || window.CanvasRenderingContext2D.mozImageSmoothingEnabled || window.CanvasRenderingContext2D.webkitImageSmoothingEnabled || window.CanvasRenderingContext2D.msImageSmoothingEnabled;
 
 function Branch(parent, content) {
   this.element = document.createElement('li');
@@ -191,16 +193,28 @@ Branch.prototype.moveUp = function() {
   if (this.parent instanceof HTMLElement) {
     e = this.parent;
   } else {
-    e = this.parent.element;
+    e = this.parent.branch_element;
+    var i = this.parent.branches.indexOf(this);
+    if (i > 0) {
+      this.parent.branches.splice(i, 1);
+      this.parent.branches.splice(i-1, 0, this);
+    }
   }
-  if (this.element.previousSibling) e.insertBefore(this.element, this.element.previousSibling);
+  if (this.element.previousSibling) {
+    e.insertBefore(this.element, this.element.previousSibling);
+  }
 }
 Branch.prototype.moveDown = function() {
   var p;
   if (this.parent instanceof HTMLElement) {
     p = this.parent;
   } else {
-    p = this.parent.element;
+    p = this.parent.branch_element;
+    var i = this.parent.branches.indexOf(this);
+    if (i != this.parent.branches.length) {
+      this.parent.branches.splice(i, 1);
+      this.parent.branches.splice(i+1, 0, this);
+    }
   }
   var e = this.element.nextSibling;
   if (!e) return;
@@ -312,11 +326,19 @@ function syncDataToTree() {
         F.getInput('add').dispatchEvent(evt);
         //
         var f = F.branches[F.branches.length-1];
-        f.setInput('x', getVal(s_F[0]));
-        f.setInput('y', getVal(s_F[1]));
-        f.setInput('w', getVal(s_F[2]));
-        f.setInput('h', getVal(s_F[3]));
-        f.setInput('t', getVal(s_F[4]));
+        if (s_F.constructor === Array) {
+          f.setInput('x', getVal(s_F[0]));
+          f.setInput('y', getVal(s_F[1]));
+          f.setInput('w', getVal(s_F[2]));
+          f.setInput('h', getVal(s_F[3]));
+          f.setInput('t', getVal(s_F[4]));
+        } else {
+          f.setInput('x', getVal(s_F.x));
+          f.setInput('y', getVal(s_F.y));
+          f.setInput('w', getVal(s_F.w));
+          f.setInput('h', getVal(s_F.h));
+          f.setInput('t', getVal(s_F.t));
+        }
       }
     }
   }
@@ -634,10 +656,7 @@ function gogogo() {
   //
   c_offscreen = document.createElement('canvas');
   o_ctx = c_offscreen.getContext('2d');
-  o_ctx.mozImageSmoothingEnabled = false;
-  o_ctx.webkitImageSmoothingEnabled = false;
-  o_ctx.msImageSmoothingEnabled = false;
-  o_ctx.imageSmoothingEnabled = false;
+  o_ctx.imageSmothingEnabled = false;
 
   // begin actual view
   c_preview = document.getElementById('preview');
@@ -646,16 +665,10 @@ function gogogo() {
   c_preview.style.width = 32+'px';
   c_preview.style.height = 32+'px';
   p_ctx = c_preview.getContext('2d');
-  p_ctx.mozImageSmoothingEnabled = false;
-  p_ctx.webkitImageSmoothingEnabled = false;
-  p_ctx.msImageSmoothingEnabled = false;
-  p_ctx.imageSmoothingEnabled = false;
+  p_ctx.imageSmothingEnabled = false;
 
   canvas = document.getElementById('display');
   ctx = canvas.getContext('2d');
-  ctx.mozImageSmoothingEnabled = false;
-  ctx.webkitImageSmoothingEnabled = false;
-  ctx.msImageSmoothingEnabled = false;
   ctx.imageSmoothingEnabled = false;
 
   ctx.lineWidth=1;
@@ -806,7 +819,17 @@ function gogogo() {
   }, false);
   document.getElementById('save').addEventListener('click', function() {
     var a = document.createElement('a');
-    var str = JSON.stringify(sprite_data);
+    var l_data = sprite_data;
+    for (A in l_data.A) {
+      for (s in l_data.A[A].S) {
+        for (f in l_data.A[A].S[s].F) {
+          var F = l_data.A[A].S[s].F[f];
+          l_data.A[A].S[s].F[f] = [F.x, F.y, F.w, F.h, F.t];
+        }
+      }
+    }
+    console.log(l_data);
+    var str = JSON.stringify(l_data);
     str = str.slice(1, str.length-1); // cut off '{' and '}'
     var file = new Blob([str], {type: 'text/javascript'});
     var url = URL.createObjectURL(file);
