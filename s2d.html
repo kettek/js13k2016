@@ -99,155 +99,10 @@ input[type='text'] {
   width: 4em;
 }
 </style>
+<script type="text/javascript" src='lib/Branch.js'></script>
 <script type="text/javascript">
 // I guess this will work...? it might not be by value, so a function returning false or true might be wiser
 window.CanvasRenderingContext2D.imageSmoothingEnabled = window.CanvasRenderingContext2D.imageSmoothingEnabled || window.CanvasRenderingContext2D.mozImageSmoothingEnabled || window.CanvasRenderingContext2D.webkitImageSmoothingEnabled || window.CanvasRenderingContext2D.msImageSmoothingEnabled;
-
-function Branch(parent, content) {
-  this.element = document.createElement('li');
-  this.title_element = document.createElement('span');
-
-  this.text_element = document.createElement('span');
-  this.text_element.innerHTML = content;
-  this.branch_element = null;
-  this.hide_element = null;
-
-  this.elements = [];
-
-  this.branches = [];
-  this.branch_map = {};
-  this.input_map = {};
-
-  this.title_element.branch = this;
-  this.title_element.appendChild(this.text_element);
-  this.element.appendChild(this.title_element);
-
-  this.parent = parent;
-  this.element.branch = this;
-  if (parent instanceof HTMLElement) {
-    parent.appendChild(this.element);
-  } else {
-    parent.branch_element.appendChild(this.element);
-  }
-}
-Branch.prototype.addHandler = function(type, cb) {
-  this.element.addEventListener(type, cb);
-}
-Branch.prototype.getInput = function(id) {
-  return this.input_map[id];
-}
-Branch.prototype.setInput = function(id, value) {
-  var input = this.getInput(id);
-  if (input) {
-    if (input.type == 'checkbox') {
-      input.checked = (value == 0 ? true : false);
-    } else {
-      input.value = value;
-    }
-  }
-}
-Branch.prototype.addInput = function(type, id, value, cb) {
-  var input_element = document.createElement('input');
-  input_element.type = type || 'text';
-  if (type == 'number') {
-    input_element.style.width = '3em';
-  } else if (type == 'text') {
-    input_element.style.width = '6em';
-  }
-  input_element.autocomplete = 'off';
-  input_element.id = id || '';
-  input_element.name = id || '';
-  input_element.value = value;
-  if (cb) input_element.addEventListener('change', cb);
-  if (cb) input_element.addEventListener('click', cb);
-
-  if (id) this.input_map[id] = input_element;
-  this.title_element.appendChild(input_element);
-  this.elements.push(input_element);
-  return this;
-}
-Branch.prototype.addText = function(value) {
-  var text_element = document.createElement('span');
-  text_element.innerText = value;
-  this.title_element.appendChild(text_element);
-  this.elements.push(text_element);
-  return this;
-}
-Branch.prototype.implode = function() {
-  for (i in this.branches) {
-    this.branches[i].implode();
-  }
-  if (!(this.parent instanceof HTMLElement)) {
-    this.parent.branches.splice(this.parent.branches.indexOf(this), 1);
-  }
-  if (this.element.parentElement) this.element.parentElement.removeChild(this.element);
-}
-Branch.prototype.showBranches = function() {
-  if (this.branch_element) this.branch_element.style.display = 'block';
-}
-Branch.prototype.hideBranches = function() {
-  if (this.branch_element) this.branch_element.style.display = 'none';
-}
-Branch.prototype.moveUp = function() {
-  var e;
-  if (this.parent instanceof HTMLElement) {
-    e = this.parent;
-  } else {
-    e = this.parent.branch_element;
-    var i = this.parent.branches.indexOf(this);
-    if (i > 0) {
-      this.parent.branches.splice(i, 1);
-      this.parent.branches.splice(i-1, 0, this);
-    }
-  }
-  if (this.element.previousSibling) {
-    e.insertBefore(this.element, this.element.previousSibling);
-  }
-}
-Branch.prototype.moveDown = function() {
-  var p;
-  if (this.parent instanceof HTMLElement) {
-    p = this.parent;
-  } else {
-    p = this.parent.branch_element;
-    var i = this.parent.branches.indexOf(this);
-    if (i != this.parent.branches.length) {
-      this.parent.branches.splice(i, 1);
-      this.parent.branches.splice(i+1, 0, this);
-    }
-  }
-  var e = this.element.nextSibling;
-  if (!e) return;
-  e = e.nextSibling;
-  if (e) p.insertBefore(this.element, e);
-  else p.appendChild(this.element);
-}
-Branch.prototype.getBranch = function(name) {
-  return this.branch_map[name];
-}
-Branch.prototype.addBranch = function(content) {
-  if (!this.hide_element) {
-    this.hide_element = document.createElement('input');
-    var _ = this;
-    this.hide_element.type = 'checkbox';
-    this.hide_element.checked = true;
-    this.hide_element.addEventListener('change', function(e) {
-        if (e.target.checked) {
-          _.showBranches();
-        } else {
-          _.hideBranches();
-        }
-    });
-    this.element.insertBefore(this.hide_element, this.title_element);
-  }
-  if (!this.branch_element) {
-    this.branch_element = document.createElement('ul');
-    this.element.appendChild(this.branch_element);
-  }
-  this.branches.push(new Branch(this, content));
-  this.branch_map[content] = this.branches[this.branches.length-1];
-  return this.branches[this.branches.length-1];
-}
 
 var sprite_data_filename = 'sprite.json';
 var sprite_data = {C: {}, A: {}};
@@ -283,7 +138,6 @@ function syncDataToTree() {
   conf.getBranch('Width: ').setInput('w', getVal(sprite_data.C.w));
   conf.getBranch('Height: ').setInput('h', getVal(sprite_data.C.h));
   conf.getBranch('Frametime: ').setInput('t', getVal(sprite_data.C.t));
-  conf.getBranch('Animate: ').setInput('a', sprite_data.C.a?true:false);
   var A = tree.getBranch('<b>Animations:</b> ');
   var a_i = 0;
   for (i in sprite_data.A) {
@@ -301,7 +155,6 @@ function syncDataToTree() {
     conf.getBranch('Width: ').setInput('w', getVal(s_A.C.w));
     conf.getBranch('Height: ').setInput('h', getVal(s_A.C.h));
     conf.getBranch('Frametime: ').setInput('t', getVal(s_A.C.t));
-    conf.getBranch('Animate: ').setInput('a', s_A.C.a?true:false || true);
     var S = a.getBranch('<b>Sets:</b> ');
     var s_i = 0;
     for (i in s_A.S) {
@@ -318,7 +171,6 @@ function syncDataToTree() {
       conf.getBranch('Width: ').setInput('w', getVal(s_S.C.w));
       conf.getBranch('Height: ').setInput('h', getVal(s_S.C.h));
       conf.getBranch('Frametime: ').setInput('t', getVal(s_S.C.t));
-      conf.getBranch('Animate: ').setInput('a', s_S.C.a?true:false || true);
       var P = s.getBranch('<b>Points:</b> ');
       for (i in s_S.P) {
         s_P = s_S.P[i];
@@ -401,7 +253,6 @@ function createTree() {
   conf.addBranch("Width: ").addInput("number", "w", '', syncData);
   conf.addBranch("Height: ").addInput("number", "h", '', syncData);
   conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
-  conf.addBranch("Animate: ").addInput("checkbox", "a", '', syncData);
   var animations = tree.addBranch('<b>Animations:</b> ');
   animations.addInput('button', 'add', '+', function(cb) {
     var anim = animations.addBranch('')
@@ -434,7 +285,6 @@ function createTree() {
     conf.addBranch("Width: ").addInput("number", "w", '', syncData);
     conf.addBranch("Height: ").addInput("number", "h", '', syncData);
     conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
-    conf.addBranch("Animate: ").addInput("checkbox", "a", '', syncData);
     var sets = anim.addBranch('<b>Sets:</b> ');
 
     sets.addInput('button', 'add', '+', function(cb) {
@@ -469,7 +319,6 @@ function createTree() {
       conf.addBranch("Width: ").addInput("number", "w", '', syncData);
       conf.addBranch("Height: ").addInput("number", "h", '', syncData);
       conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
-      conf.addBranch("Animate: ").addInput("checkbox", "a", '', syncData);
       var points = set.addBranch('<b>Points:</b> ');
       points.addInput('button', 'add', '+', function(cb) {
         var point = points.addBranch('');
@@ -588,13 +437,12 @@ function syncData() {
       // frames
       for (i in S.branches[2].branches) {
         var F = S.branches[2].branches[i];
-        var vals = F.title_element.children;
         var frame = {};
-        frame.x = parseInt(vals[2].value || sprite_data.A[A_name].S[S_name].C.x || 0);
-        frame.y = parseInt(vals[3].value || sprite_data.A[A_name].S[S_name].C.y || 0);
-        frame.w = parseInt(vals[4].value || sprite_data.A[A_name].S[S_name].C.w || 16);
-        frame.h = parseInt(vals[5].value || sprite_data.A[A_name].S[S_name].C.h || 16);
-        frame.t = parseInt(vals[6].value || sprite_data.A[A_name].S[S_name].C.t || 100);
+        frame.x = parseInt(F.getInput('x').value || sprite_data.A[A_name].S[S_name].C.x || 0);
+        frame.y = parseInt(F.getInput('y').value || sprite_data.A[A_name].S[S_name].C.y || 0);
+        frame.w = parseInt(F.getInput('w').value || sprite_data.A[A_name].S[S_name].C.w || 16);
+        frame.h = parseInt(F.getInput('w').value || sprite_data.A[A_name].S[S_name].C.h || 16);
+        frame.t = parseInt(F.getInput('ms').value || sprite_data.A[A_name].S[S_name].C.t || 100);
         sprite_data.A[A_name].S[S_name].F.push(frame);
         j++;
       }
@@ -993,17 +841,77 @@ function gogogo() {
     }
   }, false);
   document.getElementById('save').addEventListener('click', function() {
+    stopAnim();
+    disableSync();
     var a = document.createElement('a');
     var l_data = sprite_data;
+    // optimize it!
+    var x = 0, y = 0, w = 0, h = 0, t = 0;
+    if (l_data.C.x == '') delete l_data.C.x;
+    else x = l_data.C.x;
+    if (l_data.C.y == '') delete l_data.C.y;
+    else y = l_data.C.y;
+    if (l_data.C.w == '') delete l_data.C.w;
+    else w = l_data.C.w;
+    if (l_data.C.h == '') delete l_data.C.h;
+    else h = l_data.C.h;
+    if (l_data.C.t == '') delete l_data.C.t;
+    else t = l_data.C.t;
+    if (l_data.C.a) delete l_data.C.a;
+    if (Object.getOwnPropertyNames(l_data.C).length === 0) delete l_data.C;
     for (A in l_data.A) {
+      if (l_data.A[A].C.x == '' || l_data.A[A].C.x == x) delete l_data.A[A].C.x;
+      else x = l_data.A[A].C.x;
+      if (l_data.A[A].C.y == '' || l_data.A[A].C.y == y) delete l_data.A[A].C.y;
+      else y = l_data.A[A].C.y;
+      if (l_data.A[A].C.w == '' || l_data.A[A].C.w == w) delete l_data.A[A].C.w;
+      else w = l_data.A[A].C.w;
+      if (l_data.A[A].C.h == '' || l_data.A[A].C.h == h) delete l_data.A[A].C.h;
+      else h = l_data.A[A].C.h;
+      if (l_data.A[A].C.t == '' || l_data.A[A].C.t == t) delete l_data.A[A].C.t;
+      else t = l_data.A[A].C.t;
+      if (l_data.A[A].C.a) delete l_data.A[A].C.a;
+      if (Object.getOwnPropertyNames(l_data.A[A].C).length === 0) delete l_data.A[A].C;
       for (s in l_data.A[A].S) {
+        if (l_data.A[A].S[s].C.x == '' || l_data.A[A].S[s].C.x == x) delete l_data.A[A].S[s].C.x;
+        else x = l_data.A[A].S[s].C.x;
+        if (l_data.A[A].S[s].C.y == '' || l_data.A[A].S[s].C.y == y) delete l_data.A[A].S[s].C.y;
+        else y = l_data.A[A].S[s].C.y;
+        if (l_data.A[A].S[s].C.w == '' || l_data.A[A].S[s].C.w == w) delete l_data.A[A].S[s].C.w;
+        else w = l_data.A[A].S[s].C.w;
+        if (l_data.A[A].S[s].C.h == '' || l_data.A[A].S[s].C.h == h) delete l_data.A[A].S[s].C.h;
+        else h = l_data.A[A].S[s].C.h;
+        if (l_data.A[A].S[s].C.t == '' || l_data.A[A].S[s].C.t == t) delete l_data.A[A].S[s].C.t;
+        else t = l_data.A[A].S[s].C.t;
+        if (l_data.A[A].S[s].C.a) delete l_data.A[A].S[s].C.a;
+        if (Object.getOwnPropertyNames(l_data.A[A].S[s].C).length === 0) delete l_data.A[A].S[s].C;
         for (f in l_data.A[A].S[s].F) {
           var F = l_data.A[A].S[s].F[f];
-          l_data.A[A].S[s].F[f] = [F.x, F.y, F.w, F.h, F.t];
+          l_data.A[A].S[s].F[f] = [];
+          if (F.t != t) {
+            l_data.A[A].S[s].F[f].push(F.x);
+            l_data.A[A].S[s].F[f].push(F.y);
+            l_data.A[A].S[s].F[f].push(F.w);
+            l_data.A[A].S[s].F[f].push(F.h);
+            l_data.A[A].S[s].F[f].push(F.t);
+          } else if (F.h != h) {
+            l_data.A[A].S[s].F[f].push(F.x);
+            l_data.A[A].S[s].F[f].push(F.y);
+            l_data.A[A].S[s].F[f].push(F.w);
+            l_data.A[A].S[s].F[f].push(F.h);
+          } else if (F.w != w) {
+            l_data.A[A].S[s].F[f].push(F.x);
+            l_data.A[A].S[s].F[f].push(F.y);
+            l_data.A[A].S[s].F[f].push(F.w);
+          } else if (F.y != y) {
+            l_data.A[A].S[s].F[f].push(F.x);
+            l_data.A[A].S[s].F[f].push(F.y);
+          } else if (F.x != x) {
+            l_data.A[A].S[s].F[f].push(F.x);
+          }
         }
       }
     }
-    console.log(l_data);
     var str = JSON.stringify(l_data);
     str = str.slice(1, str.length-1); // cut off '{' and '}'
     var file = new Blob([str], {type: 'text/javascript'});
@@ -1016,6 +924,7 @@ function gogogo() {
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url);
     }, 0);
+    enableSync();
   }, false);
   document.getElementById('d_zoom').addEventListener('change', function(e) {
     setDisplayZoom(parseInt(e.target.value));
