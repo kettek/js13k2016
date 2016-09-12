@@ -548,7 +548,8 @@ var canvas_offset = { x: 0, y: 0 };
 
 var canvas, ctx, cboard, img, img_loaded, points, points_loaded, d_zoom, p_zoom;
 
-var c_preview, p_ctx;
+var c_preview, p_ctx, p_color;
+p_color = '#EEE';
 function drawPreview() {
   p_ctx.clearRect(0, 0, c_preview.width, c_preview.height);
   if (img_loaded) {
@@ -860,6 +861,10 @@ function gogogo() {
     cboard_h = parseInt(e.target.value);
     resizeDisplay();
   });
+  document.getElementById('p_color').addEventListener('change', function(e) {
+    document.getElementById('preview').style.backgroundColor = e.target.value;
+  });
+  document.getElementById('preview').style.backgroundColor = document.getElementById('p_color').value;
 }
 
 window.onload = gogogo;
@@ -873,6 +878,7 @@ Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<in
 <div class="vbox" id="left">
 <div id="controls">
 <canvas id="preview"></canvas><label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="3"/></label> 
+<label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
 <button id="save">Save</button>
 <br>
   <label>Animation: <input type="text" id="i_anim"/></label>
