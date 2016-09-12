@@ -96,7 +96,7 @@ input[type="number"] {
   width: 3em;
 }
 input[type='text'] {
-  width: 6em;
+  width: 4em;
 }
 </style>
 <script type="text/javascript">
@@ -319,6 +319,22 @@ function syncDataToTree() {
       conf.getBranch('Height: ').setInput('h', getVal(s_S.C.h));
       conf.getBranch('Frametime: ').setInput('t', getVal(s_S.C.t));
       conf.getBranch('Animate: ').setInput('a', s_S.C.a?true:false || true);
+      var P = s.getBranch('<b>Points:</b> ');
+      for (i in s_S.P) {
+        s_P = s_S.P[i];
+        for (j in s_P) {
+          var evt = new Event('click');
+          P.getInput('add').dispatchEvent(evt);
+          var p = P.branches[P.branches.length-1];
+          p.setInput('name', getVal(j));
+          for (k in s_P[j]) {
+            p.getInput('add').dispatchEvent(evt);
+            var pf = p.branches[p.branches.length-1];
+            pf.setInput('x', getVal(s_P[j][k][0]));
+            pf.setInput('y', getVal(s_P[j][k][1]));
+          }
+        }
+      }
       var F = s.getBranch('<b>Frames:</b> ');
       for (i in s_S.F) {
         s_F = s_S.F[i];
@@ -366,7 +382,7 @@ function createTree() {
       syncData();
       setAnim(anim.getInput("name").value);
     });
-    anim.addText("   ").addInput("button", "delete", ' del', function(cb) {
+    anim.addText("   ").addInput("button", "delete", '-', function(cb) {
       anim.implode();
       syncData();
     });
@@ -401,7 +417,7 @@ function createTree() {
         syncData();
         setSet(set.getInput("name").value);
       });
-      set.addText("   ").addInput("button", "delete", ' del', function(cb) {
+      set.addText("   ").addInput("button", "delete", ' -', function(cb) {
         set.implode();
         syncData();
       });
@@ -424,6 +440,41 @@ function createTree() {
       conf.addBranch("Height: ").addInput("number", "h", '', syncData);
       conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
       conf.addBranch("Animate: ").addInput("checkbox", "a", '', syncData);
+      var points = set.addBranch('<b>Points:</b> ');
+      points.addInput('button', 'add', '+', function(cb) {
+        var point = points.addBranch('');
+        point.addInput('text', 'name', '', syncData);
+        point.addInput('button', '', '-', function(cb) {
+          point.implode();
+          syncData();
+        });
+        point.addInput('button', 'up', '^', function(cb) {
+          point.moveUp();
+          syncData();
+        });
+        point.addInput('button', 'down', 'v', function(cb) {
+          point.moveDown();
+          syncData();
+        });
+        point.addInput('button', 'add', '+', function(cb) {
+          var pframe = point.addBranch('');
+          pframe.addInput('number', 'x', '', syncData).addInput('number', 'y', '', syncData);
+          pframe.addInput('button', '', '-', function(cb) {
+            pframe.implode();
+            syncData();
+          });
+          pframe.addInput('button', 'up', '^', function(cb) {
+            pframe.moveUp();
+            syncData();
+          });
+          pframe.addInput('button', 'down', 'v', function(cb) {
+            pframe.moveDown();
+            syncData();
+          });
+          syncData();
+        });
+        syncData();
+      });
       var frames = set.addBranch('<b>Frames:</b> ');
       frames.addInput('button', 'add', '+', function(cb) {
         var frame = frames.addBranch('');
@@ -489,8 +540,24 @@ function syncData() {
       Object.assign(sprite_data.A[A_name].S[S_name].C, sprite_data.A[A_name].C, sprite_data.A[A_name].S[S_name].C);
       // parse frames
       var j = 0;
+      // points
       for (i in S.branches[1].branches) {
-        var F = S.branches[1].branches[i];
+        var P = S.branches[1].branches[i];
+        var vals = P.title_element.children;
+        var pname = P.getInput('name').value;
+        var pobj = {};
+        pobj[pname] = [];
+        for (i in P.branches) {
+          var x = P.branches[i].getInput('x').value;
+          var y = P.branches[i].getInput('y').value;
+          pobj[pname].push([x,y]);
+        }
+        if (!sprite_data.A[A_name].S[S_name].P) sprite_data.A[A_name].S[S_name].P= [];
+        sprite_data.A[A_name].S[S_name].P.push(pobj);
+      }
+      // frames
+      for (i in S.branches[2].branches) {
+        var F = S.branches[2].branches[i];
         var vals = F.title_element.children;
         var frame = {};
         frame.x = parseInt(vals[2].value || sprite_data.A[A_name].S[S_name].C.x || 0);
@@ -652,8 +719,86 @@ function gogogo() {
     }
     cboard.src = c_offscreen.toDataURL();
   }
-  // animation preview
+  // data point stuff
+  var point_colors = {
+    "wing": "ff00ff",
+    "tail": "00ffff",
+    "head": "ff0000",
+    "arm": "00ff00",
+    "leg": "0000ff"
+  };
+  var dpoints;
+  function rgbToHex(r, g, b) {
+    if (r > 255 || g > 255 || b > 255) return '000000';
+    return ("000000" + ((r<<16)|(g<<8)|b).toString(16)).slice(-6);
+  }
+  function loadPoints() {
+    c_offscreen.width = points.width;
+    c_offscreen.height = points.height;
+    o_ctx.clearRect(0, 0, c_offscreen.width, c_offscreen.height);
+    o_ctx.drawImage(points, 0, 0);
 
+    dpoints = {};
+
+    var idat = o_ctx.getImageData(0, 0, c_offscreen.width, c_offscreen.height);
+    var pixels = idat.data;
+    for (var i = 0, n = pixels.length; i < n; i +=4) {
+      var p = i / 4;
+      var x = p % c_offscreen.width;
+      var y = Math.floor(p / c_offscreen.width);
+      var hex = rgbToHex(pixels[i], pixels[i+1], pixels[i+2]);
+      for (p in point_colors) {
+        if (point_colors[p] == hex) {
+          if (!dpoints[p]) dpoints[p] = [];
+          dpoints[p].push([x,y]);
+          break;
+        }
+      }
+    }
+    console.log(dpoints);
+
+    drawCanvas();
+  }
+  // this function maps loaded `dpoints` with existing sprite frames
+  function mapPoints() {
+    var x = 0, y = 0, w = 0, h = 0;
+    for (A in sprite_data.A) {
+      x = sprite_data.A[A].C.x || 0;
+      y = sprite_data.A[A].C.y || 0;
+      w = sprite_data.A[A].C.w || 0;
+      h = sprite_data.A[A].C.h || 0;
+      for (s in sprite_data.A[A].S) {
+        x = sprite_data.A[A].S[s].C.x || x;
+        y = sprite_data.A[A].S[s].C.y || y;
+        w = sprite_data.A[A].S[s].C.w || w;
+        h = sprite_data.A[A].S[s].C.h || h;
+        for (f in sprite_data.A[A].S[s].F) {
+          var F = sprite_data.A[A].S[s].F[f];
+          x = F.x || x;
+          y = F.y || y;
+          w = F.w || w;
+          h = F.h || h;
+          for (i in dpoints) {
+            for (j in dpoints[i]) {
+              var px = dpoints[i][j][0];
+              var py = dpoints[i][j][1];
+              if ( (px <= (x+w) && px >= x) && (py <= (y+h) && py >= y) ) {
+                /*for (p in sprite_data.A[A].S[s].P) {
+                  // check to see if the given point already exists?
+                }*/
+                if (!sprite_data.A[A].S[s].P) sprite_data.A[A].S[s].P = {};
+                if (!sprite_data.A[A].S[s].P[i]) sprite_data.A[A].S[s].P[i] = [];
+                sprite_data.A[A].S[s].P[i].push([px,py]);
+                //sprite_data.A[A].S[s].P;
+                //console.log(j+':'+i+': ' + px+'x'+py);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  // animation preview
   //
   c_offscreen = document.createElement('canvas');
   o_ctx = c_offscreen.getContext('2d');
@@ -733,9 +878,6 @@ function gogogo() {
   function loadImage() {
     drawCanvas();
   }
-  function loadPoints() {
-    drawCanvas();
-  }
   function loadData(data_) {
     sprite_data = eval('({'+data_+'})');
     syncDataToTree();
@@ -797,6 +939,7 @@ function gogogo() {
         var reader = new FileReader;
         reader.onload = function(evt) {
           points.onload = loadPoints;
+          points_loaded = 1;
           points.src = evt.target.result;
         };
         reader.readAsDataURL(file);
@@ -865,6 +1008,7 @@ function gogogo() {
     document.getElementById('preview').style.backgroundColor = e.target.value;
   });
   document.getElementById('preview').style.backgroundColor = document.getElementById('p_color').value;
+  document.getElementById('map_datapoints').addEventListener('click', mapPoints, false);
 }
 
 window.onload = gogogo;
@@ -881,11 +1025,12 @@ Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<in
 <label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
 <button id="save">Save</button>
 <br>
-  <label>Animation: <input type="text" id="i_anim"/></label>
+  <label>Anim: <input type="text" id="i_anim"/></label>
   <label>Set: <input type="text" id="i_set"/></label>
   <label>Frame: <input type="number" id="i_frame"/></label>
-
-  <button id="stop">Stop</button><button id="play">Play</button>
+  <button id="stop">&#11035;</button><button id="play">&#9654;</button>
+<br>
+<button id="map_datapoints">Map Attachment Points</button>
 </div>
 <div id="tree">
 </div>
