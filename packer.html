@@ -11,33 +11,18 @@ body,html {
   padding: 0; margin:0;
   height: 100%;
   font-family: sans-serif;
-  font-size: 14pt;
 }
 .hbox {
   height: 100%;
 }
 .item {
-  font-family: sans-serif;
-  font-size: 14pt;
-  border: 1px solid red;
   overflow: auto;
-}
-.citem {
-  flex-grow: 1;
-  flex-shrink: 1;
-  flex-basis: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 #canvas {
   background-color: #999;
 }
 #log {
   font-size: 10pt;
-}
-input[type="number"] {
-  width: 4em;
 }
 </style>
 
@@ -91,11 +76,12 @@ function gogogo() {
       for (var gx = 0; gx < width; gx++) {
         for (var gy = 0; gy < height; gy++) {
           var okay = true;
-          for (var wx = 0; wx < w; wx++) {
+          for (var wx = 0; wx <= w; wx++) {
             if (!(okay = checkGridSpace(gx+wx, gy))) break;
-            for (wy = 0; wy < h; wy++) {
+            for (var wy = 0; wy <= h; wy++) {
               if (!(okay = checkGridSpace(gx+wx, gy+wy))) break;
             }
+            if (!okay) break;
           }
           if (okay) {
             return {x: gx, y: gy, w: w, h: h};
@@ -105,9 +91,6 @@ function gogogo() {
       return null;
     }
     function growGrid(gx, gy) {
-      console.log('old size ' + width+'x'+height);
-      console.log('growing by ' + gx + 'x' + gy);
-
       for (var grow_x = 0; grow_x < gx; grow_x++) {
         grid[width+grow_x] = [];
         for (var y = 0; y < height; y++) {
@@ -138,6 +121,36 @@ function gogogo() {
     this.getWidth = function() { return width; };
     this.getHeight = function() { return height; };
   }
+  /* ================ Cropping ================ */
+  function getCroppedSize(f) {
+    canvas.width = f.w;
+    canvas.height = f.h;
+    ctx.drawImage(pairs[f.i].image, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+
+    var idat = ctx.getImageData(0, 0, f.w, f.h);
+    var pixels = idat.data;
+    var x0 = -1, x1 = -1, y0 = -1, y1 = -1;
+    for (var i = 0, n = pixels.length; i < n; i +=4) {
+      var p = i / 4;
+      var x = p % canvas.width;
+      var y = Math.floor(p / canvas.width);
+      if (pixels[i+3] > 0) {
+        if (x0 == -1 || x < x0) x0 = x;
+        if (x1 == -1 || x > x1) x1 = x;
+        if (y0 == -1 || y < y0) y0 = y;
+        if (y1 == -1 || y > y1) y1 = y;
+      }
+    }
+    // FIXME
+    //if (x0 > 0) x0--;
+    //if (y0 > 0) y0--;
+    x1++;
+    y1++;
+    //console.log(x0+'x'+x1+' '+y0+'x'+y1);
+    //console.log((x1-x0)+'x'+(y1-y0));
+
+    return {xmin:x0, xmax:x1, ymin:y0, ymax:y1};
+  }
 
   /* ================ Packing ================ */
   var all_frames = [];
@@ -157,10 +170,15 @@ function gogogo() {
     pending_frames = all_frames.slice(0);
     console.log(all_frames);
     for (var i = 0; i < pending_frames.length; i++) {
-      var fw = pending_frames[i].w;
-      var fh = pending_frames[i].h;
+      var f = pending_frames[i];
+
+      var c = getCroppedSize(pending_frames[i]);
+      pending_frames[i].c = c;
+      var w = (c.xmax-c.xmin) || 1;
+      var h = (c.ymax-c.ymin) || 1;
+
       var space = null;
-      while (!(space = grid.findGridSpace(fw, fh))) {
+      while (!(space = grid.findGridSpace(w, h))) {
         grid.growGrid(1,1);
       }
       grid.closeGridSpaces(space.x, space.y, space.w, space.h);
@@ -170,7 +188,20 @@ function gogogo() {
     canvas.height = grid.getHeight();
     for (i = 0; i < pending_frames.length; i++) {
       var f = pending_frames[i];
-      ctx.drawImage(pairs[f.i].image, f.x, f.y, f.w, f.h, f.space.x, f.space.y, f.space.w, f.space.h);
+      var c = f.c;
+      var x = f.x+c.xmin;
+      var y = f.y+c.ymin;
+      var w = (c.xmax-c.xmin) || 1;
+      var h = (c.ymax-c.ymin) || 1;
+
+      ctx.strokeStyle = "#FFFF00";
+      // THE MYSTERIES OF HTML5 CANVII
+      //ctx.strokeRect(x+0.5, y+0.5, w, h);
+      //ctx.strokeRect(f.space.x+0.5, f.space.y+0.5, f.space.w, f.space.h);
+      ctx.drawImage(pairs[f.i].image, x, y, w, h, f.space.x, f.space.y, f.space.w, f.space.h);
+      //ctx.drawImage(pairs[f.i].image, x, y, w, h, x, y, w, h);
+      //ctx.drawImage(pairs[f.i].image, x, y, w, h, f.space.x, f.space.y, f.space.w, f.space.h);
+      //ctx.drawImage(pairs[f.i].image, f.x, f.y, f.w, f.h, f.space.x, f.space.y, f.space.w, f.space.h);
     }
     /*console.log(grid.getWidth()+'x'+grid.getHeight());
     canvas.width = grid.getWidth();
@@ -247,11 +278,23 @@ function gogogo() {
   function addImage(name, data) {
     var branch = filetree.getBranch(name) || filetree.addBranch(name);
     var ibranch = branch.getBranch('image') || branch.addBranch('image');
+    if (!branch.getInput('delete')) {
+      branch.addInput("button", "delete", '-', function(cb) {
+        console.log(branch.getText());
+        branch.implode();
+      });
+    }
     doLog('added ' + name + ' image');
   }
   function addJSON(name, data) {
     var branch = filetree.getBranch(name) || filetree.addBranch(name);
     var jbranch = branch.getBranch('json') || branch.addBranch('json');
+    if (!branch.getInput('delete')) {
+      branch.addInput("button", "delete", '-', function(cb) {
+        delete pairs[branch.getText()];
+        branch.implode();
+      });
+    }
     doLog('added ' + name + ' JSON');
   }
   // set up dropping
@@ -313,7 +356,7 @@ window.onload = gogogo;
   </div>
   <div style="flex:4" class="vbox">
     <div style="flex:8" class="vbox">
-      <div class="item" id="display">
+      <div class="citem" id="display">
         <canvas id="canvas"></canvas>
       </div>
       <div class="item" id="outtree"></div>

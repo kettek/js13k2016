@@ -5,6 +5,7 @@ canvas {
   image-rendering: optimize-contrast;
   image-rendering: pixelized;
   -ms-interpolation-mode: nearest-neighbor;
+  border: 1px solid black;
 }
 /* flex */
 .hbox {
@@ -32,4 +33,49 @@ canvas {
   flex-grow: 1;
   flex-shrink: 1;
   flex-basis: 0;
+}
+.citem {
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* unified style */
+body {
+  font-family: sans-serif;
+  font-size: 10pt;
+}
+.vbox {
+  border: 1px solid rgba(128, 128, 196, 0.1);
+  background-color: rgba(128, 128, 196, 0.1);
+}
+.hbox {
+}
+.item, .citem {
+  border-right: 1px solid rgba(160, 160, 196, 0.5);
+  border-bottom: 1px solid rgba(160, 160, 196, 0.5);
+  padding: 1em;
+}
+ul {
+  padding-left: 1em;
+  border: 1px solid rgba(128, 128, 196, 0.1);
+  background-color: rgba(128, 128, 196, 0.1);
+}
+li {
+  list-style: none;
+}
+input[type="button"] {
+  margin: 0.25em;
+  border: 1px solid rgba(196, 196, 32, 0.5);
+  background-color: rgba(196, 196, 32, 0.5);
+}
+input[type="number"] {
+  margin: 0.25em;
+  border: 1px solid rgb(224, 224, 128);
+  width: 3em;
+}
+input[type='text'] {
+  width: 4em;
 }
