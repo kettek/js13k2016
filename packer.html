@@ -216,6 +216,11 @@ function gogogo() {
     combineFrames();
     canvas.toBlob(function(blob) {
       doLog('Generated PNG is '+blob.size+' bytes');
+      var size = 0;
+      for (i in pairs) {
+        size += pairs[i].image_size;
+      }
+      doLog(' difference: '+(size > blob.size ? '' : '+')+(blob.size-size));
     });
     reformatFrames();
   }
@@ -389,12 +394,14 @@ function gogogo() {
   function addImage(name, data) {
     var branch = filetree.getBranch(name) || filetree.addBranch(name);
     var ibranch = branch.getBranch('image') || branch.addBranch('image');
+    ibranch.addText(' '+pairs[getPairIndex(name)].image_size+' bytes');
     setupBranch(branch);
     doLog('added ' + name + ' image');
   }
   function addJSON(name, data) {
     var branch = filetree.getBranch(name) || filetree.addBranch(name);
     var jbranch = branch.getBranch('json') || branch.addBranch('json');
+    jbranch.addText(' '+pairs[getPairIndex(name)].data_size+' bytes');
     setupBranch(branch);
     doLog('added ' + name + ' JSON');
   }
@@ -410,6 +417,7 @@ function gogogo() {
           (function(f){
             var fname = f.substring(0,f.lastIndexOf('.'));
             var pid = acquirePairIndex(fname);
+            pairs[pid].image_size = file.size;
             reader.onload = function(evt) {
               pairs[pid].image = new Image();
               pairs[pid].image.onload = function() {
@@ -423,6 +431,7 @@ function gogogo() {
           (function(f){
             var fname = f.substring(0,f.lastIndexOf('.'));
             var pid = acquirePairIndex(fname);
+            pairs[pid].data_size = file.size;
             reader.onload = function(evt) {
               pairs[pid].json = eval('({'+evt.target.result+'})');
               addJSON(fname);
