@@ -35,6 +35,7 @@ canvas {
   flex-basis: 0;
 }
 .citem {
+  position: relative;
   flex-grow: 1;
   flex-shrink: 1;
   flex-basis: 0;
@@ -78,4 +79,52 @@ input[type="number"] {
 }
 input[type='text'] {
   width: 4em;
+}
+/* tabs */
+.Tabs-container {
+  position: relative;
+  width: 100%; height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-content: stretch;
+
+  border: 1px solid rgba(196, 196, 32, 0.1);
+  background-color: rgba(196, 196, 32, 0.1);
+}
+.Tabs-tabs {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  align-contents: stretch;
+}
+.Tabs-tab {
+  position: relative;
+  font-weight: 400;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+  border: 1px outset rgba(196, 196, 32, 0.25);
+  background-color: rgba(196, 196, 32, 0.25);
+}
+.Tabs-tab-selected {
+  position: relative;
+  font-weight: 600;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px inset rgba(196, 196, 32, 0.25);
+  background-color: rgba(196, 196, 32, 0.1);
+}
+.Tabs-contents {
+  position: relative;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+  overflow: auto;
+  padding: 0.25em;
 }

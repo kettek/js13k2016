@@ -2,6 +2,7 @@
 <html>
 <head>
 <title>vio: sprite2data</title>
+<link rel="stylesheet" href="lib/common.css">
 <style type="text/css">
 * {
   box-sizing: border-box;
@@ -32,24 +33,26 @@ canvas {
 }
 /* end flex */
 #left {
-  top: 0;
-  left: 0;
-  width: 35%;
   height: 100%;
-  padding: 1em;
 }
 #controls {
   border: 1px solid black;
   min-height: 96px;
 }
 #tree {
-  border:1px solid black;
+  position: relative;
   overflow: auto;
   max-height: 100%;
 }
+#tabs {
+  overflow: auto;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+}
 </style>
-<link rel="stylesheet" href="lib/common.css">
 <script type="text/javascript" src='lib/Branch.js'></script>
+<script type="text/javascript" src='lib/Tabs.js'></script>
 <script type="text/javascript" src='lib/Data.js'></script>
 <script type="text/javascript">
 // I guess this will work...? it might not be by value, so a function returning false or true might be wiser
@@ -848,6 +851,9 @@ function gogogo() {
   });
   document.getElementById('preview').style.backgroundColor = document.getElementById('p_color').value;
   document.getElementById('map_datapoints').addEventListener('click', mapPoints, false);
+  var tabs = new Tabs(document.getElementById('tabs'));
+  tabs.addTabFrom('Editor', document.getElementById('tree'));
+  tabs.addTabFrom('Attachmentor', document.getElementById('ptree'));
 }
 
 window.onload = gogogo;
@@ -859,20 +865,20 @@ Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<in
  <label for="d_zoom">Display Zoom: <input type="number" name="d_zoom" id="d_zoom" value="3"/></label>
  <canvas id="display"></canvas></div>
 <div class="vbox" id="left">
-<div id="controls">
-<canvas id="preview"></canvas><label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="3"/></label> 
-<label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
-<button id="save">Save</button>
-<br>
-  <label>Anim: <input type="text" id="i_anim"/></label>
-  <label>Set: <input type="text" id="i_set"/></label>
-  <label>Frame: <input type="number" id="i_frame"/></label>
-  <button id="stop">&#11035;</button><button id="play">&#9654;</button>
-<br>
-<label>Anim: <input type="text" id="map_anim"></label><label>Set: <input type="text" id="map_set"></label><button id="map_datapoints">Map Attachment Points</button>
-</div>
-<div id="ptree"></div>
-<div id="tree">
-</div>
+  <div id="controls">
+    <canvas id="preview"></canvas><label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="3"/></label> 
+    <label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
+    <button id="save">Save</button>
+    <br>
+    <label>Anim: <input type="text" id="i_anim"/></label>
+    <label>Set: <input type="text" id="i_set"/></label>
+    <label>Frame: <input type="number" id="i_frame"/></label>
+    <button id="stop">&#11035;</button><button id="play">&#9654;</button>
+    <br>
+    <label>Anim: <input type="text" id="map_anim"></label><label>Set: <input type="text" id="map_set"></label><button id="map_datapoints">Map Attachment Points</button>
+  </div>
+  <div id="tabs"></div>
+  <div id="ptree"></div>
+  <div id="tree"></div>
 </div>
 </body>
