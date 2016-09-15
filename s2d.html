@@ -17,6 +17,9 @@ canvas {
   border: 1px solid black;
   margin: 0; padding: 0;
 }
+#display {
+  cursor: crosshair;
+}
 #drop_image, #drop_points {
   padding: 1em;
   background-color: #779;
@@ -862,11 +865,11 @@ window.onload = gogogo;
 <body>
 <div id="view">
 Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<input type="number" name="cb_height" id="cb_height" value="8"/>
- <label for="d_zoom">Display Zoom: <input type="number" name="d_zoom" id="d_zoom" value="3"/></label>
+ <label for="d_zoom">Display Zoom: <input type="number" name="d_zoom" id="d_zoom" value="4"/></label>
  <canvas id="display"></canvas></div>
 <div class="vbox" id="left">
   <div id="controls">
-    <canvas id="preview"></canvas><label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="3"/></label> 
+    <canvas id="preview"></canvas><label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="2"/></label> 
     <label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
     <button id="save">Save</button>
     <br>

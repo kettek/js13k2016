@@ -107,6 +107,7 @@ input[type='text'] {
   flex-basis: 0;
   border: 1px outset rgba(196, 196, 32, 0.25);
   background-color: rgba(196, 196, 32, 0.25);
+  cursor: pointer;
 }
 .Tabs-tab-selected {
   position: relative;
@@ -119,6 +120,7 @@ input[type='text'] {
   justify-content: center;
   border: 1px inset rgba(196, 196, 32, 0.25);
   background-color: rgba(196, 196, 32, 0.1);
+  cursor: pointer;
 }
 .Tabs-contents {
   position: relative;
