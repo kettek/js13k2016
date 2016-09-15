@@ -151,6 +151,7 @@ function gogogo() {
   var mega_json = {};
   // This function creates a new large-format JSON file from the JSON files in pairs and their corresponding packed frames.
   function reformatFrames() {
+    mega_json = {};
     for (i in pairs) {
       if (!pairs[i].json) continue;
       var data = cloneObject(pairs[i].json);
@@ -405,10 +406,7 @@ function gogogo() {
     setupBranch(branch);
     doLog('added ' + name + ' JSON');
   }
-  // set up dropping
-  document.getElementById('drop').addEventListener('drop', function(evt) {
-    evt.preventDefault();
-    var files = evt.dataTransfer.files;
+  function loadFiles(files) {
     for (var i = 0; i < files.length; i++) {
       var file = files[i];
       if (typeof FileReader !== 'undefined') {
@@ -441,6 +439,11 @@ function gogogo() {
         }
       }
     }
+  }
+  // set up dropping
+  document.getElementById('drop').addEventListener('drop', function(evt) {
+    evt.preventDefault();
+    loadFiles(evt.dataTransfer.files);
   }, false);
   /* ================ Element hooks ================ */
   var e_crop_sprites = document.getElementById('crop_sprites');
@@ -481,6 +484,18 @@ function gogogo() {
     }, 0);
 
   }, false);
+
+  var h_load_files = document.createElement('input');
+  h_load_files.type = 'file';
+  h_load_files.multiple = true;
+  h_load_files.addEventListener('change', function(e) {
+      loadFiles(e.target.files);
+  });
+  var e_load_files = document.getElementById('load');
+  e_load_files.addEventListener('click', function() {
+    h_load_files.click();
+  });
+
 }
 
 window.onload = gogogo;
@@ -489,7 +504,15 @@ window.onload = gogogo;
 <body>
 <div class="hbox">
   <div class="vbox" id="drop">
-    <div class="citem">Drop PNGs and JSON here</div>
+    <div class="citem">
+      <div style="text-align:center;">
+        Drop PNGs and JSON here
+        <br>
+        <i>or</i>
+        <br>
+        <button id="load">Load PNGs/JSON</button>
+      </div>
+    </div>
     <div style="flex:4" class="item" id="filetree"></div>
     <div style="font-size:10pt" class="item">
       <label for="crop">Crop Sprites: </label><input type="checkbox" id="crop_sprites" checked/>
