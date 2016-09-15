@@ -600,13 +600,17 @@ function gogogo() {
   }
   // this function maps loaded `dpoints` with existing sprite frames
   function mapPoints() {
+    var target_a = document.getElementById('map_anim').value;
+    var target_s = document.getElementById('map_set').value;
     var x = 0, y = 0, w = 0, h = 0;
     for (A in sprite_data.A) {
+      if (target_a != '' && target_a != A) continue;
       x = sprite_data.A[A].C.x || 0;
       y = sprite_data.A[A].C.y || 0;
       w = sprite_data.A[A].C.w || 0;
       h = sprite_data.A[A].C.h || 0;
       for (s in sprite_data.A[A].S) {
+      if (target_s != '' && target_s != s) continue;
         x = sprite_data.A[A].S[s].C.x || x;
         y = sprite_data.A[A].S[s].C.y || y;
         w = sprite_data.A[A].S[s].C.w || w;
@@ -629,13 +633,15 @@ function gogogo() {
                 if (!sprite_data.A[A].S[s].P[i]) sprite_data.A[A].S[s].P[i] = [];
                 sprite_data.A[A].S[s].P[i].push([px,py]);
                 //sprite_data.A[A].S[s].P;
-                //console.log(j+':'+i+': ' + px+'x'+py);
+                console.log(j+':'+i+': ' + px+'x'+py);
+                console.log(sprite_data.A[A].S[s].P[i]);
               }
             }
           }
         }
       }
     }
+    syncDataToTree();
   }
   // animation preview
   //
@@ -863,7 +869,7 @@ Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<in
   <label>Frame: <input type="number" id="i_frame"/></label>
   <button id="stop">&#11035;</button><button id="play">&#9654;</button>
 <br>
-<button id="map_datapoints">Map Attachment Points</button>
+<label>Anim: <input type="text" id="map_anim"></label><label>Set: <input type="text" id="map_set"></label><button id="map_datapoints">Map Attachment Points</button>
 </div>
 <div id="ptree"></div>
 <div id="tree">
