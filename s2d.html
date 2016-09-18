@@ -2,6 +2,7 @@
 <html>
 <head>
 <title>vio: sprite2data</title>
+<link rel="stylesheet" href="lib/common.css">
 <style type="text/css">
 * {
   box-sizing: border-box;
@@ -13,14 +14,11 @@ html,body {
   height: 100%;
 }
 canvas {
-  image-rendering: crisp-edges;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: optimize-contrast;
-  image-rendering: pixelated;
-  -ms-interpolation-mode: nearest-neighbor;
   border: 1px solid black;
   margin: 0; padding: 0;
+}
+#display {
+  cursor: crosshair;
 }
 #drop_image, #drop_points {
   padding: 1em;
@@ -38,24 +36,27 @@ canvas {
 }
 /* end flex */
 #left {
-  top: 0;
-  left: 0;
-  width: 35%;
   height: 100%;
-  padding: 1em;
 }
 #controls {
   border: 1px solid black;
   min-height: 96px;
 }
 #tree {
-  border:1px solid black;
+  position: relative;
   overflow: auto;
   max-height: 100%;
 }
+#tabs {
+  overflow: auto;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
+}
 </style>
-<link rel="stylesheet" href="lib/common.css">
 <script type="text/javascript" src='lib/Branch.js'></script>
+<script type="text/javascript" src='lib/Tabs.js'></script>
+<script type="text/javascript" src='lib/Data.js'></script>
 <script type="text/javascript">
 // I guess this will work...? it might not be by value, so a function returning false or true might be wiser
 window.CanvasRenderingContext2D.imageSmoothingEnabled = window.CanvasRenderingContext2D.imageSmoothingEnabled || window.CanvasRenderingContext2D.mozImageSmoothingEnabled || window.CanvasRenderingContext2D.webkitImageSmoothingEnabled || window.CanvasRenderingContext2D.msImageSmoothingEnabled;
@@ -130,17 +131,15 @@ function syncDataToTree() {
       var P = s.getBranch('<b>Points:</b> ');
       for (i in s_S.P) {
         s_P = s_S.P[i];
+        var evt = new Event('click');
+        P.getInput('add').dispatchEvent(evt);
+        var p = P.branches[P.branches.length-1];
+        p.setInput('name', getVal(i));
         for (j in s_P) {
-          var evt = new Event('click');
-          P.getInput('add').dispatchEvent(evt);
-          var p = P.branches[P.branches.length-1];
-          p.setInput('name', getVal(j));
-          for (k in s_P[j]) {
-            p.getInput('add').dispatchEvent(evt);
-            var pf = p.branches[p.branches.length-1];
-            pf.setInput('x', getVal(s_P[j][k][0]));
-            pf.setInput('y', getVal(s_P[j][k][1]));
-          }
+          p.getInput('add').dispatchEvent(evt);
+          var pf = p.branches[p.branches.length-1];
+          pf.setInput('x', getVal(s_P[j][0]));
+          pf.setInput('y', getVal(s_P[j][1]));
         }
       }
       var F = s.getBranch('<b>Frames:</b> ');
@@ -380,15 +379,14 @@ function syncData() {
         var P = S.branches[1].branches[i];
         var vals = P.title_element.children;
         var pname = P.getInput('name').value;
-        var pobj = {};
-        pobj[pname] = [];
+        var pobj = [];
         for (i in P.branches) {
           var x = P.branches[i].getInput('x').value;
           var y = P.branches[i].getInput('y').value;
-          pobj[pname].push([x,y]);
+          pobj.push([x,y]);
         }
-        if (!sprite_data.A[A_name].S[S_name].P) sprite_data.A[A_name].S[S_name].P= [];
-        sprite_data.A[A_name].S[S_name].P.push(pobj);
+        if (!sprite_data.A[A_name].S[S_name].P) sprite_data.A[A_name].S[S_name].P= {};
+        sprite_data.A[A_name].S[S_name].P[pname] = pobj;
       }
       // frames
       for (i in S.branches[2].branches) {
@@ -397,7 +395,7 @@ function syncData() {
         frame.x = parseInt(F.getInput('x').value || sprite_data.A[A_name].S[S_name].C.x || 0);
         frame.y = parseInt(F.getInput('y').value || sprite_data.A[A_name].S[S_name].C.y || 0);
         frame.w = parseInt(F.getInput('w').value || sprite_data.A[A_name].S[S_name].C.w || 16);
-        frame.h = parseInt(F.getInput('w').value || sprite_data.A[A_name].S[S_name].C.h || 16);
+        frame.h = parseInt(F.getInput('h').value || sprite_data.A[A_name].S[S_name].C.h || 16);
         frame.t = parseInt(F.getInput('ms').value || sprite_data.A[A_name].S[S_name].C.t || 100);
         sprite_data.A[A_name].S[S_name].F.push(frame);
         j++;
@@ -461,7 +459,18 @@ function drawPreview() {
     var f = s.F[frame];
     if (!f) return;
 
-    p_ctx.drawImage(img, f.x, f.y, f.w||1, f.h||1, 0, 0, f.w, f.h);
+    // set our offset
+    var o_x = 0, o_y = 0;
+    if (s.P) {
+      if (s.P["offset"]) {
+        if (s.P["offset"][frame]) {
+          o_x = s.P["offset"][frame][0];
+          o_y = s.P["offset"][frame][1];
+        }
+      }
+    }
+
+    p_ctx.drawImage(img, f.x, f.y, f.w||1, f.h||1, o_x, o_y, f.w, f.h);
   }
 }
 
@@ -505,6 +514,7 @@ function playAnim() {
   s_frame = s.F[frame];
   frame_draw.do_draw = 0;
   if (!s_frame) return;
+
   drawPreview();
 
   frame_draw.do_draw = 1;
@@ -596,13 +606,17 @@ function gogogo() {
   }
   // this function maps loaded `dpoints` with existing sprite frames
   function mapPoints() {
+    var target_a = document.getElementById('map_anim').value;
+    var target_s = document.getElementById('map_set').value;
     var x = 0, y = 0, w = 0, h = 0;
     for (A in sprite_data.A) {
+      if (target_a != '' && target_a != A) continue;
       x = sprite_data.A[A].C.x || 0;
       y = sprite_data.A[A].C.y || 0;
       w = sprite_data.A[A].C.w || 0;
       h = sprite_data.A[A].C.h || 0;
       for (s in sprite_data.A[A].S) {
+      if (target_s != '' && target_s != s) continue;
         x = sprite_data.A[A].S[s].C.x || x;
         y = sprite_data.A[A].S[s].C.y || y;
         w = sprite_data.A[A].S[s].C.w || w;
@@ -625,13 +639,15 @@ function gogogo() {
                 if (!sprite_data.A[A].S[s].P[i]) sprite_data.A[A].S[s].P[i] = [];
                 sprite_data.A[A].S[s].P[i].push([px,py]);
                 //sprite_data.A[A].S[s].P;
-                //console.log(j+':'+i+': ' + px+'x'+py);
+                console.log(j+':'+i+': ' + px+'x'+py);
+                console.log(sprite_data.A[A].S[s].P[i]);
               }
             }
           }
         }
       }
     }
+    syncDataToTree();
   }
   // animation preview
   //
@@ -744,14 +760,7 @@ function gogogo() {
     drawPreview();
   }
 
-  resizeDisplay();
-  window.addEventListener('resize', resizeDisplay, false);
-  // disable default window dropping
-  window.addEventListener('dragover', function(evt) { evt.preventDefault(); }, false); window.addEventListener('drop', function(evt) { evt.preventDefault(); }, false);
-  // add our handlers
-  document.getElementById('view').addEventListener('drop', function(evt) {
-    evt.preventDefault();
-    var files = evt.dataTransfer.files;
+  function loadImageFile(files) {
     if (files.length > 0) {
       var file = files[0];
       if (typeof FileReader !== 'undefined' && file.type.indexOf('image') != -1) {
@@ -764,10 +773,8 @@ function gogogo() {
         reader.readAsDataURL(file);
       }
     }
-  }, false);
-  document.getElementById('left').addEventListener('drop', function(evt) {
-    evt.preventDefault();
-    var files = evt.dataTransfer.files;
+  }
+  function loadPointFile(files) {
     if (files.length > 0) {
       var file = files[0];
       if (typeof FileReader !== 'undefined' && file.type.indexOf('image') != -1) {
@@ -780,10 +787,8 @@ function gogogo() {
         reader.readAsDataURL(file);
       }
     }
-  }, false);
-  document.getElementById('left').addEventListener('drop', function(evt) {
-    evt.preventDefault();
-    var files = evt.dataTransfer.files;
+  }
+  function loadDataFile(files) {
     if (files.length > 0) {
       var file = files[0];
       sprite_data_filename = file.name;
@@ -795,79 +800,12 @@ function gogogo() {
         reader.readAsText(file);
       }
     }
-  }, false);
-  document.getElementById('save').addEventListener('click', function() {
+  }
+  function saveDataFile() {
     stopAnim();
     disableSync();
     var a = document.createElement('a');
-    var l_data = sprite_data;
-    // optimize it!
-    var x = 0, y = 0, w = 0, h = 0, t = 0;
-    if (l_data.C.x == '') delete l_data.C.x;
-    else x = l_data.C.x;
-    if (l_data.C.y == '') delete l_data.C.y;
-    else y = l_data.C.y;
-    if (l_data.C.w == '') delete l_data.C.w;
-    else w = l_data.C.w;
-    if (l_data.C.h == '') delete l_data.C.h;
-    else h = l_data.C.h;
-    if (l_data.C.t == '') delete l_data.C.t;
-    else t = l_data.C.t;
-    if (l_data.C.a) delete l_data.C.a;
-    if (Object.getOwnPropertyNames(l_data.C).length === 0) delete l_data.C;
-    for (A in l_data.A) {
-      if (l_data.A[A].C.x == '' || l_data.A[A].C.x == x) delete l_data.A[A].C.x;
-      else x = l_data.A[A].C.x;
-      if (l_data.A[A].C.y == '' || l_data.A[A].C.y == y) delete l_data.A[A].C.y;
-      else y = l_data.A[A].C.y;
-      if (l_data.A[A].C.w == '' || l_data.A[A].C.w == w) delete l_data.A[A].C.w;
-      else w = l_data.A[A].C.w;
-      if (l_data.A[A].C.h == '' || l_data.A[A].C.h == h) delete l_data.A[A].C.h;
-      else h = l_data.A[A].C.h;
-      if (l_data.A[A].C.t == '' || l_data.A[A].C.t == t) delete l_data.A[A].C.t;
-      else t = l_data.A[A].C.t;
-      if (l_data.A[A].C.a) delete l_data.A[A].C.a;
-      if (Object.getOwnPropertyNames(l_data.A[A].C).length === 0) delete l_data.A[A].C;
-      for (s in l_data.A[A].S) {
-        if (l_data.A[A].S[s].C.x == '' || l_data.A[A].S[s].C.x == x) delete l_data.A[A].S[s].C.x;
-        else x = l_data.A[A].S[s].C.x;
-        if (l_data.A[A].S[s].C.y == '' || l_data.A[A].S[s].C.y == y) delete l_data.A[A].S[s].C.y;
-        else y = l_data.A[A].S[s].C.y;
-        if (l_data.A[A].S[s].C.w == '' || l_data.A[A].S[s].C.w == w) delete l_data.A[A].S[s].C.w;
-        else w = l_data.A[A].S[s].C.w;
-        if (l_data.A[A].S[s].C.h == '' || l_data.A[A].S[s].C.h == h) delete l_data.A[A].S[s].C.h;
-        else h = l_data.A[A].S[s].C.h;
-        if (l_data.A[A].S[s].C.t == '' || l_data.A[A].S[s].C.t == t) delete l_data.A[A].S[s].C.t;
-        else t = l_data.A[A].S[s].C.t;
-        if (l_data.A[A].S[s].C.a) delete l_data.A[A].S[s].C.a;
-        if (Object.getOwnPropertyNames(l_data.A[A].S[s].C).length === 0) delete l_data.A[A].S[s].C;
-        for (f in l_data.A[A].S[s].F) {
-          var F = l_data.A[A].S[s].F[f];
-          l_data.A[A].S[s].F[f] = [];
-          if (F.t != t) {
-            l_data.A[A].S[s].F[f].push(F.x);
-            l_data.A[A].S[s].F[f].push(F.y);
-            l_data.A[A].S[s].F[f].push(F.w);
-            l_data.A[A].S[s].F[f].push(F.h);
-            l_data.A[A].S[s].F[f].push(F.t);
-          } else if (F.h != h) {
-            l_data.A[A].S[s].F[f].push(F.x);
-            l_data.A[A].S[s].F[f].push(F.y);
-            l_data.A[A].S[s].F[f].push(F.w);
-            l_data.A[A].S[s].F[f].push(F.h);
-          } else if (F.w != w) {
-            l_data.A[A].S[s].F[f].push(F.x);
-            l_data.A[A].S[s].F[f].push(F.y);
-            l_data.A[A].S[s].F[f].push(F.w);
-          } else if (F.y != y) {
-            l_data.A[A].S[s].F[f].push(F.x);
-            l_data.A[A].S[s].F[f].push(F.y);
-          } else if (F.x != x) {
-            l_data.A[A].S[s].F[f].push(F.x);
-          }
-        }
-      }
-    }
+    var l_data = optimizeData(sprite_data);
     var str = JSON.stringify(l_data);
     str = str.slice(1, str.length-1); // cut off '{' and '}'
     var file = new Blob([str], {type: 'text/javascript'});
@@ -881,7 +819,26 @@ function gogogo() {
       window.URL.revokeObjectURL(url);
     }, 0);
     enableSync();
+  }
+
+  resizeDisplay();
+  window.addEventListener('resize', resizeDisplay, false);
+  // disable default window dropping
+  window.addEventListener('dragover', function(evt) { evt.preventDefault(); }, false); window.addEventListener('drop', function(evt) { evt.preventDefault(); }, false);
+  // add our handlers
+  document.getElementById('view').addEventListener('drop', function(evt) {
+    evt.preventDefault();
+    loadImageFile(evt.dataTransfer.files);
   }, false);
+  document.getElementById('left').addEventListener('drop', function(evt) {
+    evt.preventDefault();
+    loadPointFile(evt.dataTransfer.files);
+  }, false);
+  document.getElementById('left').addEventListener('drop', function(evt) {
+    evt.preventDefault();
+    loadDataFile(evt.dataTransfer.files);
+  }, false);
+  document.getElementById('save').addEventListener('click', saveDataFile, false);
   document.getElementById('d_zoom').addEventListener('change', function(e) {
     setDisplayZoom(parseInt(e.target.value));
   });
@@ -905,6 +862,37 @@ function gogogo() {
   });
   document.getElementById('preview').style.backgroundColor = document.getElementById('p_color').value;
   document.getElementById('map_datapoints').addEventListener('click', mapPoints, false);
+  var tabs = new Tabs(document.getElementById('tabs'));
+  tabs.addTabFrom('Editor', document.getElementById('tree'));
+  tabs.addTabFrom('Attachmentor', document.getElementById('ptree'));
+  // set up load stuff
+  var h_load_image = document.createElement('input');
+  h_load_image.type = 'file';
+  h_load_image.addEventListener('change', function(e) {
+      loadImageFile(e.target.files);
+  });
+  var e_load_image = document.getElementById('load_image');
+  e_load_image.addEventListener('click', function() {
+    h_load_image.click();
+  });
+  var h_load_data = document.createElement('input');
+  h_load_data.type = 'file';
+  h_load_data.addEventListener('change', function(e) {
+      loadDataFile(e.target.files);
+  });
+  var e_load_data = document.getElementById('load_data');
+  e_load_data.addEventListener('click', function() {
+    h_load_data.click();
+  });
+  var h_load_points = document.createElement('input');
+  h_load_points.type = 'file';
+  h_load_points.addEventListener('change', function(e) {
+      loadPointFile(e.target.files);
+  });
+  var e_load_points = document.getElementById('load_points');
+  e_load_points.addEventListener('click', function() {
+    h_load_points.click();
+  });
 }
 
 window.onload = gogogo;
@@ -912,24 +900,27 @@ window.onload = gogogo;
 </head>
 <body>
 <div id="view">
+  <button id="load_image">Load Image: </button>
 Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<input type="number" name="cb_height" id="cb_height" value="8"/>
- <label for="d_zoom">Display Zoom: <input type="number" name="d_zoom" id="d_zoom" value="3"/></label>
+ <label for="d_zoom">Display Zoom: <input type="number" name="d_zoom" id="d_zoom" value="4"/></label>
  <canvas id="display"></canvas></div>
 <div class="vbox" id="left">
-<div id="controls">
-<canvas id="preview"></canvas><label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="3"/></label> 
-<label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
-<button id="save">Save</button>
-<br>
-  <label>Anim: <input type="text" id="i_anim"/></label>
-  <label>Set: <input type="text" id="i_set"/></label>
-  <label>Frame: <input type="number" id="i_frame"/></label>
-  <button id="stop">&#11035;</button><button id="play">&#9654;</button>
-<br>
-<button id="map_datapoints">Map Attachment Points</button>
-</div>
-<div id="ptree"></div>
-<div id="tree">
-</div>
+  <div id="controls">
+    <button id="save">Save Data</button> <button id="load_data">Load Data</button> <button id="load_points">Load Points</button>
+    <canvas id="preview"></canvas>
+    <br>
+    <label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="2"/></label> 
+    <label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
+    <br>
+    <label>Anim: <input type="text" id="i_anim"/></label>
+    <label>Set: <input type="text" id="i_set"/></label>
+    <label>Frame: <input type="number" id="i_frame"/></label>
+    <button id="stop">&#11035;</button><button id="play">&#9654;</button>
+    <br>
+    <label>Anim: <input type="text" id="map_anim"></label><label>Set: <input type="text" id="map_set"></label><button id="map_datapoints">Map Attachment Points</button>
+  </div>
+  <div id="tabs"></div>
+  <div id="ptree"></div>
+  <div id="tree"></div>
 </div>
 </body>
