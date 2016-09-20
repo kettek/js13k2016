@@ -73,21 +73,25 @@ Checkerboard: <input type="number" name="cb_width" id="cb_width" value="8"/>x<in
  <canvas id="display"></canvas></div>
 <div class="vbox" id="left">
   <div id="controls">
-    <button id="save">Save Data</button> <button id="load_data">Load Data</button> <button id="load_points">Load Points</button>
     <canvas id="preview"></canvas>
-    <br>
     <label for="p_zoom">Preview Zoom: <input type="number" name="p_zoom" id="p_zoom" value="2"/></label> 
     <label for="p_color">Preview Color: <input type="text" name="p_color" id="p_color" value="#999"/></label>
     <br>
+    <label>Sprite: <input type="text" id="i_tree"/></label>
     <label>Anim: <input type="text" id="i_anim"/></label>
     <label>Set: <input type="text" id="i_set"/></label>
     <label>Frame: <input type="number" id="i_frame"/></label>
     <button id="stop">&#11035;</button><button id="play">&#9654;</button>
     <br>
-    <label>Anim: <input type="text" id="map_anim"></label><label>Set: <input type="text" id="map_set"></label><button id="map_datapoints">Map Attachment Points</button>
+    <label>Sprite: <input type="text" id="map_tree"></label><label>Anim: <input type="text" id="map_anim"></label><label>Set: <input type="text" id="map_set"></label><button id="map_datapoints">Map Attachment Points</button>
   </div>
   <div id="tabs"></div>
   <div id="ptree"></div>
-  <div id="tree"></div>
+  <div id="tree">
+    <button id="new_sprite">New Sprite Data</button>
+    <button id="save">Save MegaData</button> <button id="load_data">Load (Mega)Data</button>
+    <button id="load_points">Load Points</button>
+    <hr>
+  </div>
 </div>
 </body>
