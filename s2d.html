@@ -68,6 +68,15 @@ set = '';
 frame = 0;
 var frame_branch = null;
 
+function getVal(val) {
+  if (typeof val !== 'undefined') return val;
+  return '';
+}
+
+/* ================ TREE CREATION ================ */
+var tree, ptree;
+var g_trees = [];
+var g_tree = null, g_anim = null, g_set = null, g_frames = null, g_frame = null;
 function parseConfBranch(c) {
   var o = {};
   for (i in c) {
@@ -81,9 +90,250 @@ function parseConfBranch(c) {
   return o;
 }
 
-function getVal(val) {
-  if (typeof val !== 'undefined') return val;
-  return '';
+function createPNode(parent) {
+  var pnode = parent.addBranch('');
+  pnode.addText('Animation: ');
+  pnode.addInput('text', 'anim', '', function(cb) {
+  });
+  pnode.addText('Offset: ');
+  pnode.addInput('number', 'offset', '0', function(cb) {
+  });
+  pnode.addInput("button", "delete", '-', function(cb) {
+    pnode.implode();
+  });
+  pnode.addInput("button", "add", "add attach", function(cb) {
+    createPNode(pnode);
+  });
+}
+
+function createPTree() {
+  if (ptree) ptree.implode();
+  ptree = new Branch(document.getElementById('ptree'), 'Animations: ');
+  ptree.addText(' Set: ');
+  ptree.addInput('text', 'set', '', function(cb) {
+  });
+  ptree.addInput('button', 'add', '+', function(cb) {
+    createPNode(ptree);
+  });
+}
+
+function createTree() {
+  if (tree) tree.implode();
+  tree = new Branch(document.getElementById('tree'), 'Sprite: ').addInput("text", "name", "");
+  var conf = tree.addBranch('Configuration');
+  conf.addBranch("X: ").addInput("number", "x", '', syncData);
+  conf.addBranch("Y: ").addInput("number", "y", '', syncData);
+  conf.addBranch("Width: ").addInput("number", "w", '', syncData);
+  conf.addBranch("Height: ").addInput("number", "h", '', syncData);
+  conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
+  var animations = tree.addBranch('<b>Animations:</b> ');
+  animations.addInput('button', 'add', '+', function(cb) {
+    var anim = animations.addBranch('')
+    anim.addInput('radio', 'anim', '', function(cb) {
+      setAnim(anim.getInput("name").value);
+      g_anim = anim;
+    });
+    anim.addInput("text", "name", '', function() {
+      syncData();
+      setAnim(anim.getInput("name").value);
+      g_anim = anim;
+    });
+    anim.addText("   ").addInput("button", "delete", '-', function(cb) {
+      anim.implode();
+      g_anim = null;
+      g_set = null;
+      g_frames = null;
+      syncData();
+    });
+    anim.addInput('button', 'up', '^', function(cb) {
+      anim.moveUp();
+      syncData();
+    });
+    anim.addInput('button', 'down', 'v', function(cb) {
+      anim.moveDown();
+      syncData();
+    });
+    anim.addHandler('click', function(e) {
+      setAnim(anim.getInput("name").value);
+      g_anim = anim;
+    });
+
+    var conf = anim.addBranch("Configuration");
+    conf.addBranch("X: ").addInput("number", "x", '', syncData);
+    conf.addBranch("Y: ").addInput("number", "y", '', syncData);
+    conf.addBranch("Width: ").addInput("number", "w", '', syncData);
+    conf.addBranch("Height: ").addInput("number", "h", '', syncData);
+    conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
+    var sets = anim.addBranch('<b>Sets:</b> ');
+
+    sets.addInput('button', 'add', '+', function(cb) {
+      var set = sets.addBranch('');
+      set.addInput('radio', 'set', '', function(cb) {
+        setSet(set.getInput("name").value);
+        g_set = set;
+      });
+
+      set.addInput('text', 'name', '', function() {
+        syncData();
+        setSet(set.getInput("name").value);
+        g_set = set;
+      });
+      set.addText("   ").addInput("button", "delete", ' -', function(cb) {
+        set.implode();
+        g_set = null;
+        g_frames = null;
+        syncData();
+      });
+      set.addHandler('click', function(e) {
+        setSet(set.getInput("name").value);
+        g_set = set;
+      });
+      set.addInput('button', 'up', '^', function(cb) {
+        set.moveUp();
+        syncData();
+      });
+      set.addInput('button', 'down', 'v', function(cb) {
+        set.moveDown();
+        syncData();
+      });
+
+      var conf = set.addBranch("Configuration");
+      conf.addBranch("X: ").addInput("number", "x", '', syncData);
+      conf.addBranch("Y: ").addInput("number", "y", '', syncData);
+      conf.addBranch("Width: ").addInput("number", "w", '', syncData);
+      conf.addBranch("Height: ").addInput("number", "h", '', syncData);
+      conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
+      var points = set.addBranch('<b>Points:</b> ');
+      points.addInput('button', 'add', '+', function(cb) {
+        var point = points.addBranch('');
+        point.addInput('text', 'name', '', syncData);
+        point.addInput('button', '', '-', function(cb) {
+          point.implode();
+          syncData();
+        });
+        point.addInput('button', 'up', '^', function(cb) {
+          point.moveUp();
+          syncData();
+        });
+        point.addInput('button', 'down', 'v', function(cb) {
+          point.moveDown();
+          syncData();
+        });
+        point.addInput('button', 'add', '+', function(cb) {
+          var pframe = point.addBranch('');
+          pframe.addInput('number', 'x', '', syncData).addInput('number', 'y', '', syncData);
+          pframe.addInput('button', '', '-', function(cb) {
+            pframe.implode();
+            syncData();
+          });
+          pframe.addInput('button', 'up', '^', function(cb) {
+            pframe.moveUp();
+            syncData();
+          });
+          pframe.addInput('button', 'down', 'v', function(cb) {
+            pframe.moveDown();
+            syncData();
+          });
+          syncData();
+        });
+        syncData();
+      });
+      var frames = set.addBranch('<b>Frames:</b> ');
+      frames.addInput('button', 'add', '+', function(cb) {
+        var frame = frames.addBranch('');
+        frame.addHandler('click', function(e) {
+          var i = frames.branches.indexOf(frame);
+          setFrame(i);
+          frame_branch = frame;
+          g_frame = frame;
+          g_frames = frames;
+        });
+        frame.addInput('radio', 'frame', '', function(cb) {
+          var i = frames.branches.indexOf(frame);
+          setFrame(i);
+          frame_branch = frame;
+          g_frame = frame;
+          g_frames = frames;
+        });
+        frame.addInput('number', 'x', '', syncData).addInput('number', 'y', '', syncData).addInput('number', 'w', '', syncData).addInput('number', 'h', '', syncData).addInput('number', 'ms', '', syncData).addInput('button', '', '-', function(cb) {
+          frame.implode();
+          g_frame = null;
+          syncData();
+        });
+        frame.addInput('button', 'up', '^', function(cb) {
+          frame.moveUp();
+          syncData();
+        });
+        frame.addInput('button', 'down', 'v', function(cb) {
+          frame.moveDown();
+          syncData();
+        });
+        syncData();
+      });
+      syncData();
+    });
+    syncData();
+  });
+}
+
+/* ================ TREE SYNCHRONIZATION ================ */
+var can_sync = true;
+function disableSync() {
+  can_sync = false;
+}
+function enableSync() {
+  can_sync = true;
+}
+function syncData() {
+  if (!can_sync) return;
+  sprite_data = {C: {}, A: {}};
+  // read conf
+  sprite_data.C = parseConfBranch(tree.branches[0].branches);
+  // read animations
+  sprite_data.A = {};
+  for (i in tree.branches[1].branches) {
+    var A = tree.branches[1].branches[i];
+    var A_name = A.title_element.children[2].value;
+    sprite_data.A[A_name] = {C: {}, S:{}};
+    sprite_data.A[A_name].C = parseConfBranch(A.branches[0].branches);
+    Object.assign(sprite_data.A[A_name].C, sprite_data.C, sprite_data.A[A_name].C);
+    // parse sets
+    for (i in A.branches[1].branches) {
+      var S = A.branches[1].branches[i];
+      var S_name = S.title_element.children[2].value;
+      sprite_data.A[A_name].S[S_name] = {C: {}, F: []};
+      sprite_data.A[A_name].S[S_name].C = parseConfBranch(S.branches[0].branches);
+      Object.assign(sprite_data.A[A_name].S[S_name].C, sprite_data.A[A_name].C, sprite_data.A[A_name].S[S_name].C);
+      // parse frames
+      var j = 0;
+      // points
+      for (i in S.branches[1].branches) {
+        var P = S.branches[1].branches[i];
+        var vals = P.title_element.children;
+        var pname = P.getInput('name').value;
+        var pobj = [];
+        for (i in P.branches) {
+          var x = P.branches[i].getInput('x').value;
+          var y = P.branches[i].getInput('y').value;
+          pobj.push([x,y]);
+        }
+        if (!sprite_data.A[A_name].S[S_name].P) sprite_data.A[A_name].S[S_name].P= {};
+        sprite_data.A[A_name].S[S_name].P[pname] = pobj;
+      }
+      // frames
+      for (i in S.branches[2].branches) {
+        var F = S.branches[2].branches[i];
+        var frame = {};
+        frame.x = parseInt(F.getInput('x').value || sprite_data.A[A_name].S[S_name].C.x || 0);
+        frame.y = parseInt(F.getInput('y').value || sprite_data.A[A_name].S[S_name].C.y || 0);
+        frame.w = parseInt(F.getInput('w').value || sprite_data.A[A_name].S[S_name].C.w || 16);
+        frame.h = parseInt(F.getInput('h').value || sprite_data.A[A_name].S[S_name].C.h || 16);
+        frame.t = parseInt(F.getInput('ms').value || sprite_data.A[A_name].S[S_name].C.t || 100);
+        sprite_data.A[A_name].S[S_name].F.push(frame);
+        j++;
+      }
+    }
+  }
 }
 
 function syncDataToTree() {
@@ -169,241 +419,6 @@ function syncDataToTree() {
   syncData();
 }
 
-function getPNodes() {
-}
-
-function createPNode(parent) {
-  var pnode = parent.addBranch('');
-  pnode.addText('Animation: ');
-  pnode.addInput('text', 'anim', '', function(cb) {
-  });
-  pnode.addText('Offset: ');
-  pnode.addInput('number', 'offset', '0', function(cb) {
-  });
-  pnode.addInput("button", "delete", '-', function(cb) {
-    pnode.implode();
-  });
-  pnode.addInput("button", "add", "add attach", function(cb) {
-    createPNode(pnode);
-  });
-}
-
-function createPTree() {
-  if (ptree) ptree.implode();
-  ptree = new Branch(document.getElementById('ptree'), 'Animations: ');
-  ptree.addText(' Set: ');
-  ptree.addInput('text', 'set', '', function(cb) {
-  });
-  ptree.addInput('button', 'add', '+', function(cb) {
-    createPNode(ptree);
-  });
-}
-
-function createTree() {
-  if (tree) tree.implode();
-  tree = new Branch(document.getElementById('tree'), 'Sprite: ').addInput("text", "name", "");
-  var conf = tree.addBranch('Configuration');
-  conf.addBranch("X: ").addInput("number", "x", '', syncData);
-  conf.addBranch("Y: ").addInput("number", "y", '', syncData);
-  conf.addBranch("Width: ").addInput("number", "w", '', syncData);
-  conf.addBranch("Height: ").addInput("number", "h", '', syncData);
-  conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
-  var animations = tree.addBranch('<b>Animations:</b> ');
-  animations.addInput('button', 'add', '+', function(cb) {
-    var anim = animations.addBranch('')
-    anim.addInput('radio', 'anim', '', function(cb) {
-      setAnim(anim.getInput("name").value);
-    });
-    anim.addInput("text", "name", '', function() {
-      syncData();
-      setAnim(anim.getInput("name").value);
-    });
-    anim.addText("   ").addInput("button", "delete", '-', function(cb) {
-      anim.implode();
-      syncData();
-    });
-    anim.addInput('button', 'up', '^', function(cb) {
-      anim.moveUp();
-      syncData();
-    });
-    anim.addInput('button', 'down', 'v', function(cb) {
-      anim.moveDown();
-      syncData();
-    });
-    anim.addHandler('click', function(e) {
-      setAnim(anim.getInput("name").value);
-    });
-
-    var conf = anim.addBranch("Configuration");
-    conf.addBranch("X: ").addInput("number", "x", '', syncData);
-    conf.addBranch("Y: ").addInput("number", "y", '', syncData);
-    conf.addBranch("Width: ").addInput("number", "w", '', syncData);
-    conf.addBranch("Height: ").addInput("number", "h", '', syncData);
-    conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
-    var sets = anim.addBranch('<b>Sets:</b> ');
-
-    sets.addInput('button', 'add', '+', function(cb) {
-      var set = sets.addBranch('');
-      set.addInput('radio', 'set', '', function(cb) {
-        setSet(set.getInput("name").value);
-      });
-
-      set.addInput('text', 'name', '', function() {
-        syncData();
-        setSet(set.getInput("name").value);
-      });
-      set.addText("   ").addInput("button", "delete", ' -', function(cb) {
-        set.implode();
-        syncData();
-      });
-      set.addHandler('click', function(e) {
-        setSet(set.getInput("name").value);
-      });
-      set.addInput('button', 'up', '^', function(cb) {
-        set.moveUp();
-        syncData();
-      });
-      set.addInput('button', 'down', 'v', function(cb) {
-        set.moveDown();
-        syncData();
-      });
-
-      var conf = set.addBranch("Configuration");
-      conf.addBranch("X: ").addInput("number", "x", '', syncData);
-      conf.addBranch("Y: ").addInput("number", "y", '', syncData);
-      conf.addBranch("Width: ").addInput("number", "w", '', syncData);
-      conf.addBranch("Height: ").addInput("number", "h", '', syncData);
-      conf.addBranch("Frametime: ").addInput("number", "t", '', syncData);
-      var points = set.addBranch('<b>Points:</b> ');
-      points.addInput('button', 'add', '+', function(cb) {
-        var point = points.addBranch('');
-        point.addInput('text', 'name', '', syncData);
-        point.addInput('button', '', '-', function(cb) {
-          point.implode();
-          syncData();
-        });
-        point.addInput('button', 'up', '^', function(cb) {
-          point.moveUp();
-          syncData();
-        });
-        point.addInput('button', 'down', 'v', function(cb) {
-          point.moveDown();
-          syncData();
-        });
-        point.addInput('button', 'add', '+', function(cb) {
-          var pframe = point.addBranch('');
-          pframe.addInput('number', 'x', '', syncData).addInput('number', 'y', '', syncData);
-          pframe.addInput('button', '', '-', function(cb) {
-            pframe.implode();
-            syncData();
-          });
-          pframe.addInput('button', 'up', '^', function(cb) {
-            pframe.moveUp();
-            syncData();
-          });
-          pframe.addInput('button', 'down', 'v', function(cb) {
-            pframe.moveDown();
-            syncData();
-          });
-          syncData();
-        });
-        syncData();
-      });
-      var frames = set.addBranch('<b>Frames:</b> ');
-      frames.addInput('button', 'add', '+', function(cb) {
-        var frame = frames.addBranch('');
-        frame.addHandler('click', function(e) {
-          var i = frames.branches.indexOf(frame);
-          setFrame(i);
-          frame_branch = frame;
-        });
-        frame.addInput('radio', 'frame', '', function(cb) {
-          var i = frames.branches.indexOf(frame);
-          setFrame(i);
-          frame_branch = frame;
-        });
-        frame.addInput('number', 'x', '', syncData).addInput('number', 'y', '', syncData).addInput('number', 'w', '', syncData).addInput('number', 'h', '', syncData).addInput('number', 'ms', '', syncData).addInput('button', '', '-', function(cb) {
-          frame.implode();
-          syncData();
-        });
-        frame.addInput('button', 'up', '^', function(cb) {
-          frame.moveUp();
-          syncData();
-        });
-        frame.addInput('button', 'down', 'v', function(cb) {
-          frame.moveDown();
-          syncData();
-        });
-        syncData();
-      });
-      syncData();
-    });
-    syncData();
-  });
-
-}
-
-var can_sync = true;
-
-function disableSync() {
-  can_sync = false;
-}
-function enableSync() {
-  can_sync = true;
-}
-
-function syncData() {
-  if (!can_sync) return;
-  sprite_data = {C: {}, A: {}};
-  // read conf
-  sprite_data.C = parseConfBranch(tree.branches[0].branches);
-  // read animations
-  sprite_data.A = {};
-  for (i in tree.branches[1].branches) {
-    var A = tree.branches[1].branches[i];
-    var A_name = A.title_element.children[2].value;
-    sprite_data.A[A_name] = {C: {}, S:{}};
-    sprite_data.A[A_name].C = parseConfBranch(A.branches[0].branches);
-    Object.assign(sprite_data.A[A_name].C, sprite_data.C, sprite_data.A[A_name].C);
-    // parse sets
-    for (i in A.branches[1].branches) {
-      var S = A.branches[1].branches[i];
-      var S_name = S.title_element.children[2].value;
-      sprite_data.A[A_name].S[S_name] = {C: {}, F: []};
-      sprite_data.A[A_name].S[S_name].C = parseConfBranch(S.branches[0].branches);
-      Object.assign(sprite_data.A[A_name].S[S_name].C, sprite_data.A[A_name].C, sprite_data.A[A_name].S[S_name].C);
-      // parse frames
-      var j = 0;
-      // points
-      for (i in S.branches[1].branches) {
-        var P = S.branches[1].branches[i];
-        var vals = P.title_element.children;
-        var pname = P.getInput('name').value;
-        var pobj = [];
-        for (i in P.branches) {
-          var x = P.branches[i].getInput('x').value;
-          var y = P.branches[i].getInput('y').value;
-          pobj.push([x,y]);
-        }
-        if (!sprite_data.A[A_name].S[S_name].P) sprite_data.A[A_name].S[S_name].P= {};
-        sprite_data.A[A_name].S[S_name].P[pname] = pobj;
-      }
-      // frames
-      for (i in S.branches[2].branches) {
-        var F = S.branches[2].branches[i];
-        var frame = {};
-        frame.x = parseInt(F.getInput('x').value || sprite_data.A[A_name].S[S_name].C.x || 0);
-        frame.y = parseInt(F.getInput('y').value || sprite_data.A[A_name].S[S_name].C.y || 0);
-        frame.w = parseInt(F.getInput('w').value || sprite_data.A[A_name].S[S_name].C.w || 16);
-        frame.h = parseInt(F.getInput('h').value || sprite_data.A[A_name].S[S_name].C.h || 16);
-        frame.t = parseInt(F.getInput('ms').value || sprite_data.A[A_name].S[S_name].C.t || 100);
-        sprite_data.A[A_name].S[S_name].F.push(frame);
-        j++;
-      }
-    }
-  }
-}
-
 function setAnim(anim_) {
   document.getElementById('i_anim').value = anim;
   anim = anim_;
@@ -439,15 +454,13 @@ function setFrameDraw() {
     drawCanvas();
   }
 }
-
-var tree, ptree;
+/* ================ RENDERING ================ */
+var canvas, ctx, cboard, img, img_loaded, points, points_loaded, d_zoom, p_zoom;
+var c_preview, p_ctx, p_color;
 var frame_draw = { do_draw: 0, x: 0, y: 0, w: 0, h: 0 };
 var mouse = { held: 0, sx: 0, sy: 0, ex: 0, ey: 0 };
 var canvas_offset = { x: 0, y: 0 };
 
-var canvas, ctx, cboard, img, img_loaded, points, points_loaded, d_zoom, p_zoom;
-
-var c_preview, p_ctx, p_color;
 p_color = '#EEE';
 function drawPreview() {
   p_ctx.clearRect(0, 0, c_preview.width, c_preview.height);
@@ -533,6 +546,11 @@ function stopAnim() {
 }
 var cboard_w = 8;
 var cboard_h = 8;
+
+var e_view, e_left, e_save;
+var e_d_zoom;
+var e_cb_width, e_cb_height;
+var e_preview, e_p_zoom, e_p_color, e_p_height;
 
 function gogogo() {
   anim = document.getElementById('i_anim').value;
@@ -825,42 +843,54 @@ function gogogo() {
   window.addEventListener('resize', resizeDisplay, false);
   // disable default window dropping
   window.addEventListener('dragover', function(evt) { evt.preventDefault(); }, false); window.addEventListener('drop', function(evt) { evt.preventDefault(); }, false);
+
+  e_view = document.getElementById('view');
+  e_left = document.getElementById('left');
+  e_save = document.getElementById('save');
+  e_d_zoom = document.getElementById('d_zoom');
+  e_p_zoom = document.getElementById('p_zoom');
+  e_cb_width = document.getElementById('cb_width');
+  e_cb_height = document.getElementById('cb_height');
+  e_p_color = document.getElementById('p_color');
+  e_p_height = document.getElementById('p_height');
+  e_preview = document.getElementById('preview');
+
   // add our handlers
-  document.getElementById('view').addEventListener('drop', function(evt) {
+  e_view.addEventListener('drop', function(evt) {
     evt.preventDefault();
     loadImageFile(evt.dataTransfer.files);
   }, false);
-  document.getElementById('left').addEventListener('drop', function(evt) {
+  e_left.addEventListener('drop', function(evt) {
     evt.preventDefault();
     loadPointFile(evt.dataTransfer.files);
   }, false);
-  document.getElementById('left').addEventListener('drop', function(evt) {
+  e_left.addEventListener('drop', function(evt) {
     evt.preventDefault();
     loadDataFile(evt.dataTransfer.files);
   }, false);
-  document.getElementById('save').addEventListener('click', saveDataFile, false);
-  document.getElementById('d_zoom').addEventListener('change', function(e) {
+  e_save.addEventListener('click', saveDataFile, false);
+  e_d_zoom.addEventListener('change', function(e) {
     setDisplayZoom(parseInt(e.target.value));
   });
-  setDisplayZoom(parseInt(document.getElementById('d_zoom').value));
+  setDisplayZoom(parseInt(e_d_zoom.value));
 
-  document.getElementById('p_zoom').addEventListener('change', function(e) {
+  e_p_zoom.addEventListener('change', function(e) {
     setPreviewZoom(parseInt(e.target.value));
   });
-  setPreviewZoom(parseInt(document.getElementById('p_zoom').value));
+  setPreviewZoom(parseInt(e_p_zoom.value));
 
-  document.getElementById('cb_width').addEventListener('change', function(e) {
+  e_cb_width.addEventListener('change', function(e) {
     cboard_w = parseInt(e.target.value);
     resizeDisplay();
   });
-  document.getElementById('cb_height').addEventListener('change', function(e) {
+  e_cb_height.addEventListener('change', function(e) {
     cboard_h = parseInt(e.target.value);
     resizeDisplay();
   });
-  document.getElementById('p_color').addEventListener('change', function(e) {
-    document.getElementById('preview').style.backgroundColor = e.target.value;
+  e_p_color.addEventListener('change', function(e) {
+    e_preview.style.backgroundColor = e.target.value;
   });
-  document.getElementById('preview').style.backgroundColor = document.getElementById('p_color').value;
+  e_preview.style.backgroundColor = e_p_color.value;
   document.getElementById('map_datapoints').addEventListener('click', mapPoints, false);
   var tabs = new Tabs(document.getElementById('tabs'));
   tabs.addTabFrom('Editor', document.getElementById('tree'));
