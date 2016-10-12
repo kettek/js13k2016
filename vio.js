@@ -501,10 +501,6 @@ function cloneObject(c) {
       //   * QUIT
     }
   };
-  var nsend = function(type, data) {
-  };
-  var nsendall = function(type, data) {
-  };
   /* ==== Class load/create ==== */
   function loadClasses(names) {
     return new Promise(function(resolve, reject) {
@@ -553,12 +549,7 @@ function cloneObject(c) {
   }
   /* ==== Objects ==== */
   function createObject(name) {
-    var object = {};
-    if (typeof classes[name] === 'undefined') {
-      console.log('Error, class ' + name + ' does not exist!');
-    } else {
-      object = cloneObject(classes[name]);
-    }
+    var object = cloneObject(classes[name]) || {};
     // TODO: game object id
     if (object.S) object.S = createSprite(object.S, 16, 16, 0);
     var args = Array.prototype.slice.call(arguments, 1);
@@ -650,15 +641,6 @@ function cloneObject(c) {
       this.menus = [];
     }
   };
-  var LobbyState = {
-    // herein lies joining a lobby and creating TravelState
-    onInit: function() {
-    },
-    onClose: function() {
-    },
-    onTick: function(d) {
-    }
-  };
   var TravelState = {
     // herein lies connecting to a given server and resetting world objects
   };
@@ -719,11 +701,11 @@ function cloneObject(c) {
       }
       // client
       {
-        keys[37] ? nsend(3,0):0; // left
+        /*keys[37] ? nsend(3,0):0; // left
         keys[39] ? nsend(3,1):0; // right
         keys[38] ? nsend(3,2):0; // up
         keys[40] ? nsend(3,3):0; // down
-        keys[90] ? nsend(3,4):0; // z
+        keys[90] ? nsend(3,4):0; // z*/
         /*
         check for pending game packets and update our objects in accordance with them
         */
@@ -765,4 +747,70 @@ function cloneObject(c) {
   window['createSprite']=createSprite;
   window['createObject']=createObject;
   window['keys']=keys;
+  //
+  var classes_src = {
+    entity: {
+      F:0,
+      x:0,
+      y:0,
+      n:'',
+      v:{x:0,y:0},
+      f:0,
+      P:1,
+      c: [],
+      p: null,
+      attach: function(p) {
+        this.detach();
+        p.c.push(this);
+        this.p = parent;
+      },
+      detach: function() {
+        if (!this.p) return;
+        var i = this.p.c.indexOf(this);
+        if (i != 1) this.p.c.splice(i, 1);
+        this.p = null;
+      }
+    },
+  };
+
+  var Classes=[];
+  Classes['entity']=function() {
+    var _=this;
+    _.F=_.x=_.y=_.f=0;
+    _.n='';
+    _.v={x:0,y:0};
+    _.P=1;
+    _.c=[];
+    _.p=null;
+    _.attach=function(p) {
+      var _=this;
+      _.detach();
+      p.c.push(_);
+      _.p = parent;
+    }
+    _.detach=function(){
+      var _=this;
+      if (!_.p) return;
+      var i = _.p.c.indexOf(_);
+      if (i != 1) _.pc.splice(i, 1);
+      _.p = null;
+    }
+  };
+  var class_player = function() {
+    Classes['entity'].call(this);
+    var _ = this;
+    _.n='player';
+    _.S='thing';
+    _.walk=function() {
+    }
+  }; class_player.prototype = new Classes['entity'];
+  var a = new class_player();
+  var b = new class_player();
+  var c = new class_player();
+  a.attach(b);
+
+  console.log(a);
+  console.log(b);
+  console.log(c);
+
 })();
