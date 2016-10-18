@@ -1,0 +1,3 @@
+[submodule "lib/ktkUI-js"]
+	path = lib/ktkUI-js
+	url = https://github.com/kettek/ktkUI-js.git
